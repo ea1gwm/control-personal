@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Personal v5</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1f2937;
+    --border: #30363d; --accent: #f59e0b; --accent2: #10b981;
+    --accent3: #3b82f6; --danger: #ef4444; --purple: #8b5cf6;
+    --text: #e6edf3; --text2: #8b949e; --text3: #6e7681;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; font-size: 14px; }
+
+  header {
+    background: var(--surface); border-bottom: 2px solid var(--accent);
+    padding: 16px 24px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 100;
+  }
+  header h1 { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; color: var(--accent); }
+  .date-badge { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text2); background: var(--surface2); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); }
+
+  .tabs { display: flex; gap: 4px; padding: 16px 24px 0; border-bottom: 1px solid var(--border); background: var(--surface); flex-wrap: wrap; }
+  .tab-btn { background: none; border: none; color: var(--text2); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; padding: 10px 18px; cursor: pointer; border-radius: 6px 6px 0 0; border-bottom: 2px solid transparent; transition: all 0.2s; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(245,158,11,0.05); }
+
+  .main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  .card-title { font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 1.5px; color: var(--accent); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  label { font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: 0.8px; text-transform: uppercase; }
+  input, select, textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color 0.2s; width: 100%; }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  select option { background: var(--surface2); }
+
+  /* EMPLEADOS GRID */
+  .empleados-grid { display: flex; flex-direction: column; gap: 12px; }
+  .empleado-row {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 18px; transition: border-color 0.2s;
+  }
+  .empleado-row:hover { border-color: var(--accent); }
+  .empleado-row.tiene-datos { border-color: var(--accent2); }
+  .empleado-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; cursor: pointer; }
+  .empleado-nombre { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 1px; color: var(--text); }
+  .empleado-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .emp-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 10px; }
+  .emp-fields.hidden { display: none; }
+
+  .check-group { display: flex; align-items: center; gap: 8px; background: var(--surface2); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s; }
+  .check-group:hover { border-color: var(--accent); }
+  .check-group.activo { border-color: var(--accent2); background: rgba(16,185,129,0.08); }
+  .check-group input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent2); cursor: pointer; }
+  .check-group label { font-size: 12px; color: var(--text); cursor: pointer; text-transform: none; letter-spacing: 0; font-weight: 500; }
+
+  .with-amount { display: flex; gap: 6px; align-items: center; }
+  .with-amount input[type=number] { width: 80px; flex-shrink: 0; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; }
+  .badge-dieta { background: rgba(245,158,11,0.15); color: var(--accent); }
+  .badge-baja { background: rgba(239,68,68,0.15); color: var(--danger); }
+  .badge-vac { background: rgba(59,130,246,0.15); color: var(--accent3); }
+  .badge-extra { background: rgba(139,92,246,0.15); color: var(--purple); }
+  .badge-ok { background: rgba(16,185,129,0.15); color: var(--accent2); }
+  .badge-cedido { background: rgba(245,158,11,0.1); color: var(--accent); }
+
+  .save-btn { background: var(--accent); color: #000; border: none; padding: 12px 28px; border-radius: 8px; font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 1.5px; cursor: pointer; transition: all 0.2s; margin-top: 8px; }
+  .save-btn:hover { background: #fbbf24; transform: translateY(-1px); }
+
+  /* RESUMEN */
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .sum-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+  .sum-val { font-family: 'Bebas Neue', sans-serif; font-size: 32px; line-height: 1; color: var(--accent); }
+  .sum-label { font-size: 11px; color: var(--text2); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.8px; }
+  .sum-sub { font-size: 11px; color: var(--text3); margin-top: 4px; font-family: 'DM Mono', monospace; }
+
+  .log-table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'DM Mono', monospace; }
+  th { background: var(--surface2); color: var(--text2); font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text); white-space: nowrap; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* DATA BUTTONS */
+  .data-btn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .data-btn { display: flex; flex-direction: column; align-items: flex-start; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; cursor: pointer; text-align: left; transition: all 0.2s; font-family: 'DM Sans', sans-serif; }
+  .data-btn:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .data-btn .db-icon { font-size: 24px; margin-bottom: 10px; }
+  .data-btn .db-title { font-family: 'Bebas Neue', sans-serif; font-size: 15px; letter-spacing: 1.5px; color: var(--accent); margin-bottom: 4px; }
+  .data-btn .db-desc { font-size: 11px; color: var(--text3); line-height: 1.5; }
+  .data-btn.green:hover { border-color: var(--accent2); }
+  .data-btn.green .db-title { color: var(--accent2); }
+  .data-btn.blue:hover { border-color: var(--accent3); }
+  .data-btn.blue .db-title { color: var(--accent3); }
+  .data-btn.danger:hover { border-color: var(--danger); }
+  .data-btn.danger .db-title { color: var(--danger); }
+
+  .inp-cloud { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .inp-cloud input { flex: 1; }
+  .cloud-sync-btn { background: var(--accent3); color: #fff; border: none; padding: 9px 16px; border-radius: 6px; font-family: 'Bebas Neue', sans-serif; font-size: 14px; letter-spacing: 1px; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+  .cloud-sync-btn:hover { background: #60a5fa; }
+  .cloud-sync-btn.secondary { background: var(--surface2); color: var(--text2); }
+  .cloud-sync-btn.secondary:hover { background: var(--border); color: var(--text); }
+  .cloud-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); margin-top: 12px; font-family: 'DM Mono', monospace; }
+  .cloud-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent2); }
+  .cloud-dot.off { background: var(--text3); }
+  .sync-info { font-size: 11px; color: var(--text3); margin-top: 6px; line-height: 1.6; }
+
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--accent2); color: #000; padding: 12px 20px; border-radius: 8px; font-weight: 600; font-size: 13px; z-index: 999; opacity: 0; transform: translateY(10px); transition: all 0.3s; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  .del-btn { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 12px; padding: 4px 8px; border-radius: 4px; transition: all 0.2s; }
+  .del-btn:hover { color: var(--danger); }
+
+  .empleados-admin { display: flex; flex-direction: column; gap: 8px; }
+  .emp-admin-row { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; }
+  .emp-admin-row input { flex: 1; }
+  .remove-emp-btn { background: none; border: 1px solid var(--border); color: var(--text3); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
+  .remove-emp-btn:hover { border-color: var(--danger); color: var(--danger); }
+  .add-emp-btn { background: none; border: 1px dashed var(--border); color: var(--text2); padding: 10px; border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; width: 100%; transition: all 0.2s; margin-top: 8px; }
+  .add-emp-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .filter-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 16px; }
+  .filter-row .form-group { min-width: 140px; }
+
+  @media (max-width: 600px) {
+    .emp-fields { grid-template-columns: 1fr 1fr; }
+    header h1 { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚙️ Control de Personal</h1>
+  <div class="date-badge" id="headerDate"></div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('registro')">📋 Registro Diario</button>
+  <button class="tab-btn" onclick="switchTab('resumen')">📊 Resumen Mensual</button>
+  <button class="tab-btn" onclick="switchTab('datos')">💾 Datos</button>
+</div>
+
+<div class="main">
+
+  <!-- TAB REGISTRO DIARIO -->
+  <div id="tab-registro" class="tab-content active">
+    <div class="card">
+      <div class="card-title"><span>📅</span> Fecha del Registro</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Fecha</label>
+          <input type="date" id="inp-fecha">
+        </div>
+        <div class="form-group" style="justify-content:flex-end">
+          <label>&nbsp;</label>
+          <div class="check-group" id="cg-autosync" style="border-color:var(--accent3)">
+            <input type="checkbox" id="cb-autosync">
+            <label for="cb-autosync" style="color:var(--accent3)">☁️ Sincronizar con nube al guardar</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>👷</span> Empleados</div>
+      <div class="empleados-grid" id="empleados-grid"></div>
+    </div>
+
+    <button class="save-btn" onclick="guardarDia()">💾 GUARDAR DÍA</button>
+  </div>
+
+  <!-- TAB RESUMEN MENSUAL -->
+  <div id="tab-resumen" class="tab-content">
+    <div class="card">
+      <div class="card-title"><span>🔍</span> Filtro</div>
+      <div class="filter-row">
+        <div class="form-group">
+          <label>Mes</label>
+          <select id="filter-mes" onchange="renderResumen()">
+            <option value="0">Enero</option><option value="1">Febrero</option>
+            <option value="2">Marzo</option><option value="3">Abril</option>
+            <option value="4">Mayo</option><option value="5">Junio</option>
+            <option value="6">Julio</option><option value="7">Agosto</option>
+            <option value="8">Septiembre</option><option value="9">Octubre</option>
+            <option value="10">Noviembre</option><option value="11">Diciembre</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Año</label>
+          <input type="number" id="filter-anio" value="2026" oninput="renderResumen()">
+        </div>
+      </div>
+    </div>
+    <div id="resumen-content"></div>
+  </div>
+
+  <!-- TAB DATOS -->
+  <div id="tab-datos" class="tab-content">
+
+    <!-- GESTIÓN EMPLEADOS -->
+    <div class="card">
+      <div class="card-title"><span>👤</span> Gestión de Empleados</div>
+      <div class="empleados-admin" id="empleados-admin"></div>
+      <button class="add-emp-btn" onclick="addEmpleadoAdmin()">+ Añadir empleado</button>
+      <button class="save-btn" style="margin-top:14px" onclick="guardarEmpleados()">💾 GUARDAR CAMBIOS</button>
+    </div>
+
+    <!-- DIETA CONFIG -->
+    <div class="card">
+      <div class="card-title"><span>🍽️</span> Importe de Dietas</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Media dieta (€)</label>
+          <input type="number" id="cfg-media-dieta" value="15" min="0" step="0.5">
+        </div>
+      </div>
+      <button class="save-btn" style="margin-top:14px" onclick="guardarConfig()">💾 GUARDAR CONFIG</button>
+    </div>
+
+    <!-- BACKUP JSON -->
+    <div class="card">
+      <div class="card-title"><span>📦</span> Copia de Seguridad (JSON)</div>
+      <div class="data-btn-grid">
+        <button class="data-btn green" onclick="exportarJSON()">
+          <div class="db-icon">⬇️</div>
+          <div class="db-title">Exportar JSON</div>
+          <div class="db-desc">Descarga todos los datos en un archivo .json.</div>
+        </button>
+        <button class="data-btn blue" onclick="document.getElementById('import-input').click()">
+          <div class="db-icon">⬆️</div>
+          <div class="db-title">Importar JSON</div>
+          <div class="db-desc">Carga un archivo .json exportado previamente.</div>
+        </button>
+      </div>
+      <input type="file" id="import-input" accept=".json" style="display:none" onchange="importarJSON(event)">
+    </div>
+
+    <!-- EXPORT CSV -->
+    <div class="card">
+      <div class="card-title"><span>📊</span> Exportar a Excel / CSV</div>
+      <div class="data-btn-grid">
+        <button class="data-btn green" onclick="exportarCSV('todo')">
+          <div class="db-icon">📋</div>
+          <div class="db-title">Exportar Todo</div>
+          <div class="db-desc">Todos los registros en un CSV.</div>
+        </button>
+        <button class="data-btn blue" onclick="exportarCSV('mes')">
+          <div class="db-icon">📅</div>
+          <div class="db-title">Exportar Mes Actual</div>
+          <div class="db-desc">Solo los registros del mes seleccionado.</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- NUBE GIST -->
+    <div class="card">
+      <div class="card-title"><span>☁️</span> Sincronización en la Nube (GitHub Gist)</div>
+      <p class="sync-info">1. Ve a <strong style="color:var(--accent3)">github.com/settings/tokens</strong> → genera un token con permiso <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">gist</code><br>
+      2. Pega el token aquí. La primera vez se crea el Gist automáticamente.<br>
+      3. Guarda el Gist ID que aparece — introdúcelo en otros dispositivos para sincronizar.</p>
+      <div class="inp-cloud" style="flex-wrap:wrap;gap:8px;margin-top:14px">
+        <input type="password" id="gh-token" placeholder="GitHub Token (ghp_...)" style="min-width:200px;flex:2">
+        <input type="text" id="gh-gist-id" placeholder="Gist ID (opcional)" style="min-width:160px;flex:1">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="cloud-sync-btn" onclick="subirNube()">SUBIR DATOS</button>
+        <button class="cloud-sync-btn secondary" onclick="bajarNube()">DESCARGAR DE NUBE</button>
+      </div>
+      <div class="cloud-status" id="cloud-status" style="display:none">
+        <div class="cloud-dot" id="cloud-dot"></div>
+        <span id="cloud-status-text"></span>
+      </div>
+    </div>
+
+    <!-- PELIGRO -->
+    <div class="card">
+      <div class="card-title" style="color:var(--danger)"><span>⚠️</span> Zona Peligrosa</div>
+      <div class="data-btn-grid">
+        <button class="data-btn danger" onclick="borrarTodo()">
+          <div class="db-icon">🗑️</div>
+          <div class="db-title">Borrar Todos los Datos</div>
+          <div class="db-desc">Elimina permanentemente todos los registros.</div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const STORAGE_KEY = 'control-personal-v1';
+const STORAGE_EMP = 'control-personal-empleados';
+const STORAGE_CFG = 'control-personal-config';
+const GIST_FILENAME = 'control-personal-data.json';
+
+const MOTIVOS = [
+  { key: 'dieta_media', label: 'Media Dieta', badge: 'badge-dieta', hasAmount: false },
+  { key: 'dieta_completa', label: 'Dieta Completa', badge: 'badge-dieta', hasAmount: true, amountLabel: '€' },
+  { key: 'baja', label: 'Baja Médica', badge: 'badge-baja', hasAmount: false },
+  { key: 'vacaciones', label: 'Vacaciones', badge: 'badge-vac', hasAmount: false },
+  { key: 'permiso', label: 'Permiso Retribuido', badge: 'badge-ok', hasAmount: false },
+  { key: 'asuntos_propios', label: 'Asuntos Propios', badge: 'badge-ok', hasAmount: false },
+  { key: 'curso', label: 'Curso', badge: 'badge-ok', hasAmount: false },
+  { key: 'cedido_rd', label: 'Cedido Rd', badge: 'badge-cedido', hasAmount: false },
+  { key: 'cedido_fg', label: 'Cedido Fg', badge: 'badge-cedido', hasAmount: false },
+  { key: 'cedido_ra', label: 'Cedido Ra', badge: 'badge-cedido', hasAmount: false },
+  { key: 'horas_extra', label: 'Horas Extra', badge: 'badge-extra', hasAmount: true, amountLabel: 'h' },
+  { key: 'horas_nocturnas', label: 'Horas Nocturnas', badge: 'badge-extra', hasAmount: true, amountLabel: 'h' },
+  { key: 'reconocimiento', label: 'Reconoc. Médico', badge: 'badge-ok', hasAmount: false },
+  { key: 'jefe_provisional', label: 'Jefe Provisional', badge: 'badge-ok', hasAmount: false },
+  { key: 'conductor_provisional', label: 'Conductor Provisional', badge: 'badge-ok', hasAmount: false },
+  { key: 'falta', label: 'Falta', badge: 'badge-baja', hasAmount: false, hasText: true },
+];
+
+const DEFAULT_EMPLEADOS = ['Yago', 'Juan', 'Jorge', 'Marcos', 'Braulio'];
+
+// ── INIT ────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('inp-fecha').value = today;
+  document.getElementById('headerDate').textContent = formatDate(today);
+  document.getElementById('filter-mes').value = new Date().getMonth();
+  document.getElementById('filter-anio').value = new Date().getFullYear();
+  const savedGist = localStorage.getItem('gistid-personal');
+  if (savedGist) document.getElementById('gh-gist-id').value = savedGist;
+  const cfg = getConfig();
+  document.getElementById('cfg-media-dieta').value = cfg.mediaDieta || 15;
+  renderEmpleadosAdmin();
+  renderEmpleadosGrid();
+  renderResumen();
+});
+
+// ── DATA ────────────────────────────────────────────────────────
+function getData() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; } }
+function saveData(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+function getEmpleados() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_EMP)) || DEFAULT_EMPLEADOS; } catch { return DEFAULT_EMPLEADOS; }
+}
+function saveEmpleados(e) { localStorage.setItem(STORAGE_EMP, JSON.stringify(e)); }
+function getConfig() { try { return JSON.parse(localStorage.getItem(STORAGE_CFG)) || { mediaDieta: 15 }; } catch { return { mediaDieta: 15 }; } }
+function saveConfig(c) { localStorage.setItem(STORAGE_CFG, JSON.stringify(c)); }
+
+// ── TABS ────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'resumen') renderResumen();
+  if (name === 'datos') renderEmpleadosAdmin();
+}
+
+// ── EMPLEADOS GRID (Registro Diario) ────────────────────────────
+function renderEmpleadosGrid() {
+  const empleados = getEmpleados();
+  const fecha = document.getElementById('inp-fecha').value;
+  const data = getData();
+  const existing = data.find(d => d.fecha === fecha);
+  const wrap = document.getElementById('empleados-grid');
+
+  wrap.innerHTML = empleados.map(nombre => {
+    const empData = existing ? existing.empleados.find(e => e.nombre === nombre) : null;
+    return buildEmpleadoRow(nombre, empData);
+  }).join('');
+
+  // Restaurar estados de checkboxes
+  if (existing) {
+    existing.empleados.forEach(empData => {
+      MOTIVOS.forEach(m => {
+        const cb = document.getElementById(`cb-${empData.nombre}-${m.key}`);
+        if (cb && empData[m.key]) {
+          cb.checked = true;
+          toggleCheck(cb, empData.nombre, m.key);
+          if (m.hasAmount) {
+            const inp = document.getElementById(`amt-${empData.nombre}-${m.key}`);
+            if (inp) inp.value = empData[m.key + '_amt'] || '';
+          }
+          if (m.hasText) {
+            const inp = document.getElementById(`txt-${empData.nombre}-${m.key}`);
+            if (inp) inp.value = empData[m.key + '_txt'] || '';
+          }
+        }
+      });
+      updateEmpleadoBadges(empData.nombre);
+    });
+  }
+}
+
+function buildEmpleadoRow(nombre, empData) {
+  const motivosHTML = MOTIVOS.map(m => {
+    let extra = '';
+    if (m.hasAmount) {
+      extra = `<input type="number" id="amt-${nombre}-${m.key}" placeholder="0" min="0" step="0.5" style="width:70px;padding:4px 8px;font-size:12px" oninput="autoCheckFromAmount(this,'${nombre}','${m.key}')">
+               <span style="font-size:11px;color:var(--text3)">${m.amountLabel}</span>`;
+    }
+    if (m.hasText) {
+      extra = `<input type="text" id="txt-${nombre}-${m.key}" placeholder="Motivo..." style="flex:1;padding:4px 8px;font-size:12px">`;
+    }
+    return `<div class="check-group" id="cg-${nombre}-${m.key}">
+      <input type="checkbox" id="cb-${nombre}-${m.key}" onchange="toggleCheck(this,'${nombre}','${m.key}')">
+      <label for="cb-${nombre}-${m.key}">${m.label}</label>
+      ${extra}
+    </div>`;
+  }).join('');
+
+  return `<div class="empleado-row" id="er-${nombre}">
+    <div class="empleado-header" onclick="toggleEmpleado('${nombre}')">
+      <div class="empleado-nombre">👷 ${nombre}</div>
+      <div class="empleado-badges" id="badges-${nombre}"></div>
+    </div>
+    <div class="emp-fields hidden" id="fields-${nombre}">
+      ${motivosHTML}
+      <div class="check-group" style="grid-column:1/-1">
+        <label style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text2)">📝 Notas</label>
+        <input type="text" id="nota-${nombre}" placeholder="Observaciones..." style="flex:1;padding:4px 8px;font-size:12px">
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleEmpleado(nombre) {
+  const fields = document.getElementById('fields-' + nombre);
+  fields.classList.toggle('hidden');
+}
+
+function toggleCheck(cb, nombre, key) {
+  const cg = document.getElementById(`cg-${nombre}-${key}`);
+  if (cb.checked) {
+    cg.classList.add('activo');
+    document.getElementById(`er-${nombre}`).classList.add('tiene-datos');
+  } else {
+    cg.classList.remove('activo');
+  }
+  updateEmpleadoBadges(nombre);
+}
+
+function updateEmpleadoBadges(nombre) {
+  const badges = [];
+  MOTIVOS.forEach(m => {
+    const cb = document.getElementById(`cb-${nombre}-${m.key}`);
+    if (cb && cb.checked) {
+      let label = m.label;
+      if (m.hasAmount) {
+        const amt = document.getElementById(`amt-${nombre}-${m.key}`);
+        if (amt && amt.value) label += ` (${amt.value}${m.amountLabel})`;
+      }
+      badges.push(`<span class="badge ${m.badge}">${label}</span>`);
+    }
+  });
+  const wrap = document.getElementById('badges-' + nombre);
+  if (wrap) wrap.innerHTML = badges.join('');
+
+  // Si tiene algo marcado, mostrar borde verde en la fila
+  const row = document.getElementById('er-' + nombre);
+  if (badges.length > 0) row.classList.add('tiene-datos');
+  else row.classList.remove('tiene-datos');
+}
+
+// ── AUTO-CHECK DESDE AMOUNT ─────────────────────────────────────
+function autoCheckFromAmount(inputEl, nombre, key) {
+  const cb = document.getElementById(`cb-${nombre}-${key}`);
+  if (!cb) return;
+  if (parseFloat(inputEl.value) > 0) {
+    if (!cb.checked) {
+      cb.checked = true;
+      toggleCheck(cb, nombre, key);
+    }
+  } else {
+    cb.checked = false;
+    toggleCheck(cb, nombre, key);
+  }
+  updateEmpleadoBadges(nombre);
+}
+
+// ── GUARDAR DÍA ─────────────────────────────────────────────────
+function guardarDia() {
+  const fecha = document.getElementById('inp-fecha').value;
+  if (!fecha) { showToast('⚠️ Introduce la fecha', 'warn'); return; }
+
+  const empleados = getEmpleados();
+  const registros = empleados.map(nombre => {
+    const emp = { nombre };
+    MOTIVOS.forEach(m => {
+      const cb = document.getElementById(`cb-${nombre}-${m.key}`);
+      emp[m.key] = cb ? cb.checked : false;
+      if (m.hasAmount) {
+        const inp = document.getElementById(`amt-${nombre}-${m.key}`);
+        emp[m.key + '_amt'] = inp ? (parseFloat(inp.value) || 0) : 0;
+      }
+      if (m.hasText) {
+        const inp = document.getElementById(`txt-${nombre}-${m.key}`);
+        emp[m.key + '_txt'] = inp ? inp.value : '';
+      }
+    });
+    const nota = document.getElementById(`nota-${nombre}`);
+    emp.notas = nota ? nota.value : '';
+    return emp;
+  });
+
+  const data = getData();
+  const idx = data.findIndex(d => d.fecha === fecha);
+  const entry = { fecha, empleados: registros };
+  if (idx >= 0) data[idx] = entry; else data.push(entry);
+  data.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  saveData(data);
+  showToast('✅ Día guardado correctamente');
+  renderResumen();
+  if (document.getElementById('cb-autosync') && document.getElementById('cb-autosync').checked) {
+    const token = document.getElementById('gh-token').value.trim();
+    if (token) {
+      subirNube(true);
+    } else {
+      showToast('⚠️ Para sincronizar automáticamente introduce el token en Datos → Nube', 'warn');
+    }
+  }
+}
+
+// ── RESUMEN MENSUAL ─────────────────────────────────────────────
+function renderResumen() {
+  const mes = parseInt(document.getElementById('filter-mes').value);
+  const anio = parseInt(document.getElementById('filter-anio').value);
+  const data = getData().filter(d => {
+    const dt = new Date(d.fecha + 'T00:00:00');
+    return dt.getMonth() === mes && dt.getFullYear() === anio;
+  });
+  const wrap = document.getElementById('resumen-content');
+  if (!data.length) {
+    wrap.innerHTML = '<div class="card"><div style="text-align:center;padding:40px;color:var(--text3);font-size:13px"><div style="font-size:32px;margin-bottom:8px">📊</div>Sin datos para este mes.</div></div>';
+    return;
+  }
+
+  const cfg = getConfig();
+  const empleados = getEmpleados();
+  const diasTrabajados = data.length;
+
+  // Acumulados por empleado
+  const acum = {};
+  empleados.forEach(n => {
+    acum[n] = { mediaDietas: 0, completaDietas: 0, completaImporte: 0, baja: 0, vacaciones: 0, permiso: 0, asuntos: 0, curso: 0, cedido_rd: 0, cedido_fg: 0, cedido_ra: 0, hExtra: 0, hNocturnas: 0, reconocimiento: 0, jefe: 0, conductor: 0, faltas: 0, dias: [] };
+  });
+
+  data.forEach(d => {
+    d.empleados.forEach(e => {
+      if (!acum[e.nombre]) return;
+      const a = acum[e.nombre];
+      const tieneAlgo = MOTIVOS.some(m => e[m.key]);
+      if (tieneAlgo || e.notas) a.dias.push({ fecha: d.fecha, emp: e });
+      if (e.dieta_media) a.mediaDietas++;
+      if (e.dieta_completa) { a.completaDietas++; a.completaImporte += e.dieta_completa_amt || 0; }
+      if (e.baja) a.baja++;
+      if (e.vacaciones) a.vacaciones++;
+      if (e.permiso) a.permiso++;
+      if (e.asuntos_propios) a.asuntos++;
+      if (e.curso) a.curso++;
+      if (e.cedido_rd) a.cedido_rd++;
+      if (e.cedido_fg) a.cedido_fg++;
+      if (e.cedido_ra) a.cedido_ra++;
+      if (e.horas_extra) a.hExtra += e.horas_extra_amt || 0;
+      if (e.horas_nocturnas) a.hNocturnas += e.horas_nocturnas_amt || 0;
+      if (e.reconocimiento) a.reconocimiento++;
+      if (e.jefe_provisional) a.jefe++;
+      if (e.conductor_provisional) a.conductor++;
+      if (e.falta) a.faltas++;
+    });
+  });
+
+  // Totales generales
+  const totalMediaDietas = empleados.reduce((s, n) => s + acum[n].mediaDietas, 0);
+  const totalCompletaDietas = empleados.reduce((s, n) => s + acum[n].completaDietas, 0);
+  const totalImporteMediaDietas = totalMediaDietas * (cfg.mediaDieta || 15);
+  const totalImporteCompletaDietas = empleados.reduce((s, n) => s + acum[n].completaImporte, 0);
+  const totalHExtra = empleados.reduce((s, n) => s + acum[n].hExtra, 0);
+  const totalHNocturnas = empleados.reduce((s, n) => s + acum[n].hNocturnas, 0);
+
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  // Tabla detalle por empleado
+  const tablaEmpleados = empleados.map(n => {
+    const a = acum[n];
+    const importeTotal = (a.mediaDietas * (cfg.mediaDieta || 15)) + a.completaImporte;
+    const cedidoStr = [a.cedido_rd ? `Rd:${a.cedido_rd}d` : '', a.cedido_fg ? `Fg:${a.cedido_fg}d` : '', a.cedido_ra ? `Ra:${a.cedido_ra}d` : ''].filter(Boolean).join(' ') || '—';
+    return `<tr>
+      <td style="font-weight:600;color:var(--text)">${n}</td>
+      <td>${a.mediaDietas > 0 ? `<span class="badge badge-dieta">${a.mediaDietas}d</span>` : '—'}</td>
+      <td>${a.completaDietas > 0 ? `<span class="badge badge-dieta">${a.completaDietas}d</span>` : '—'}</td>
+      <td style="color:var(--accent)">${importeTotal > 0 ? importeTotal.toFixed(2) + '€' : '—'}</td>
+      <td>${a.hExtra > 0 ? `<span class="badge badge-extra">${a.hExtra}h</span>` : '—'}</td>
+      <td>${a.hNocturnas > 0 ? `<span class="badge badge-extra">${a.hNocturnas}h</span>` : '—'}</td>
+      <td>${a.baja > 0 ? `<span class="badge badge-baja">${a.baja}d</span>` : '—'}</td>
+      <td>${a.vacaciones > 0 ? `<span class="badge badge-vac">${a.vacaciones}d</span>` : '—'}</td>
+      <td>${cedidoStr}</td>
+      <td>${[a.permiso?'Perm.':'', a.curso?'Curso':'', a.jefe?'Jefe':'', a.conductor?'Cond.':'', a.reconocimiento?'Rec.':'', a.faltas?`Falta(${a.faltas})`:''].filter(Boolean).join(', ') || '—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Detalle día a día (para el resumen visual para WhatsApp)
+  const detalleDias = data.map(d => {
+    const filas = d.empleados.filter(e => MOTIVOS.some(m => e[m.key]) || e.notas).map(e => {
+      const items = MOTIVOS.filter(m => e[m.key]).map(m => {
+        let txt = m.label;
+        if (m.hasAmount && e[m.key + '_amt']) txt += ` (${e[m.key + '_amt']}${m.amountLabel})`;
+        if (m.hasText && e[m.key + '_txt']) txt += `: ${e[m.key + '_txt']}`;
+        return `<span class="badge ${m.badge}" style="margin:2px">${txt}</span>`;
+      }).join(' ');
+      const nota = e.notas ? `<span style="color:var(--text3);font-size:11px"> · ${e.notas}</span>` : '';
+      return `<tr>
+        <td style="color:var(--text);font-weight:500">${e.nombre}</td>
+        <td style="max-width:400px;white-space:normal">${items}${nota}</td>
+        <td><button class="del-btn" onclick="editarDia('${d.fecha}')" title="Editar">✏️</button></td>
+      </tr>`;
+    }).join('');
+    if (!filas) return '';
+    return `<tr style="background:var(--surface2)"><td colspan="3" style="font-weight:600;color:var(--accent);font-family:'Bebas Neue',sans-serif;letter-spacing:1px;font-size:14px">📅 ${formatDate(d.fecha)}</td></tr>${filas}`;
+  }).filter(Boolean).join('');
+
+  wrap.innerHTML = `
+    <div class="card">
+      <div class="card-title"><span>🎯</span> Resumen ${meses[mes]} ${anio}</div>
+      <div class="summary-grid">
+        <div class="sum-card"><div class="sum-val">${diasTrabajados}</div><div class="sum-label">Días con registro</div></div>
+        <div class="sum-card"><div class="sum-val" style="color:var(--accent)">${totalMediaDietas}</div><div class="sum-label">Medias Dietas</div><div class="sum-sub">${totalImporteMediaDietas.toFixed(2)}€ total</div></div>
+        ${totalCompletaDietas > 0 ? `<div class="sum-card"><div class="sum-val" style="color:var(--accent)">${totalCompletaDietas}</div><div class="sum-label">Dietas Completas</div><div class="sum-sub">${totalImporteCompletaDietas.toFixed(2)}€ total</div></div>` : ''}
+        <div class="sum-card"><div class="sum-val" style="color:var(--purple)">${totalHExtra}</div><div class="sum-label">Horas Extra</div></div>
+        <div class="sum-card"><div class="sum-val" style="color:var(--purple)">${totalHNocturnas}</div><div class="sum-label">Horas Nocturnas</div></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+      <button onclick="copiarWhatsApp()" style="display:flex;align-items:center;gap:8px;background:var(--accent2);color:#000;border:none;padding:12px 20px;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;cursor:pointer;transition:all 0.2s">
+        📋 COPIAR PARA WHATSAPP
+      </button>
+      <button onclick="compartirWhatsApp()" style="display:flex;align-items:center;gap:8px;background:var(--accent3);color:#fff;border:none;padding:12px 20px;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;cursor:pointer;transition:all 0.2s">
+        📤 COMPARTIR
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>👷</span> Detalle por Empleado — ${meses[mes]} ${anio}</div>
+      <div class="log-table-wrap">
+        <table>
+          <thead><tr>
+            <th>Empleado</th><th>½ Dieta</th><th>Dieta Comp.</th><th>Importe</th>
+            <th>H. Extra</th><th>H. Noct.</th><th>Baja</th><th>Vacac.</th><th>Cedido</th><th>Otros</th>
+          </tr></thead>
+          <tbody>${tablaEmpleados}</tbody>
+        </table>
+      </div>
+    </div>
+
+    ${detalleDias ? `
+    <div class="card">
+      <div class="card-title"><span>📋</span> Detalle Día a Día</div>
+      <div class="log-table-wrap">
+        <table>
+          <thead><tr><th>Empleado</th><th>Incidencias</th><th></th></tr></thead>
+          <tbody>${detalleDias}</tbody>
+        </table>
+      </div>
+    </div>` : ''}
+  `;
+}
+
+// ── EDITAR DÍA ──────────────────────────────────────────────────
+function editarDia(fecha) {
+  document.getElementById('inp-fecha').value = fecha;
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-registro').classList.add('active');
+  document.querySelector('.tab-btn[onclick*="registro"]').classList.add('active');
+  renderEmpleadosGrid();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  showToast('✏️ Editando día ' + formatDate(fecha));
+}
+
+// Al cambiar la fecha, recargar los datos de ese día
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('inp-fecha').addEventListener('change', () => renderEmpleadosGrid());
+});
+
+// ── GESTIÓN EMPLEADOS ───────────────────────────────────────────
+function renderEmpleadosAdmin() {
+  const empleados = getEmpleados();
+  const wrap = document.getElementById('empleados-admin');
+  wrap.innerHTML = empleados.map((n, i) => `
+    <div class="emp-admin-row">
+      <input type="text" value="${n}" id="emp-input-${i}" placeholder="Nombre empleado">
+      <button class="remove-emp-btn" onclick="removeEmpleadoAdmin(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function addEmpleadoAdmin() {
+  const empleados = getEmpleados();
+  empleados.push('');
+  saveEmpleados(empleados);
+  renderEmpleadosAdmin();
+}
+
+function removeEmpleadoAdmin(i) {
+  const empleados = getEmpleados();
+  empleados.splice(i, 1);
+  saveEmpleados(empleados);
+  renderEmpleadosAdmin();
+}
+
+function guardarEmpleados() {
+  const inputs = document.querySelectorAll('[id^="emp-input-"]');
+  const empleados = Array.from(inputs).map(i => i.value.trim()).filter(Boolean);
+  saveEmpleados(empleados);
+  renderEmpleadosGrid();
+  showToast('✅ Empleados guardados');
+}
+
+function guardarConfig() {
+  const mediaDieta = parseFloat(document.getElementById('cfg-media-dieta').value) || 15;
+  saveConfig({ mediaDieta });
+  showToast('✅ Configuración guardada');
+}
+
+// ── UTILS ───────────────────────────────────────────────────────
+function formatDate(str) {
+  if (!str) return '';
+  const [y, m, d] = str.split('-');
+  const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return `${d} ${months[parseInt(m)-1]} ${y}`;
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = type === 'warn' ? 'var(--accent)' : 'var(--accent2)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── EXPORT JSON ─────────────────────────────────────────────────
+function exportarJSON() {
+  const payload = { registros: getData(), empleados: getEmpleados(), config: getConfig() };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `control-personal-${new Date().toISOString().split('T')[0]}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast('✅ JSON exportado');
+}
+
+function importarJSON(event) {
+  const file = event.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const imp = JSON.parse(e.target.result);
+      if (imp.registros) saveData(imp.registros);
+      if (imp.empleados) saveEmpleados(imp.empleados);
+      if (imp.config) saveConfig(imp.config);
+      showToast('✅ Datos importados correctamente');
+      renderEmpleadosGrid(); renderResumen();
+    } catch { showToast('⚠️ Archivo JSON inválido', 'warn'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ── EXPORT CSV ──────────────────────────────────────────────────
+function exportarCSV(scope) {
+  let data = getData();
+  if (scope === 'mes') {
+    const mes = parseInt(document.getElementById('filter-mes').value);
+    const anio = parseInt(document.getElementById('filter-anio').value);
+    data = data.filter(d => { const dt = new Date(d.fecha + 'T00:00:00'); return dt.getMonth() === mes && dt.getFullYear() === anio; });
+  }
+  if (!data.length) { showToast('⚠️ No hay datos para exportar', 'warn'); return; }
+
+  const cfg = getConfig();
+  const headers = ['Fecha','Empleado','Media Dieta','Dieta Completa','Importe Dieta (€)','H. Extra','H. Nocturnas','Baja','Vacaciones','Permiso Retribuido','Asuntos Propios','Curso','Cedido Rd','Cedido Fg','Cedido Ra','Reconoc. Médico','Jefe Provisional','Conductor Provisional','Falta','Motivo Falta','Notas'];
+  const rows = [];
+  data.forEach(d => {
+    d.empleados.forEach(e => {
+      const importeDieta = (e.dieta_media ? (cfg.mediaDieta || 15) : 0) + (e.dieta_completa ? (e.dieta_completa_amt || 0) : 0);
+      rows.push([
+        d.fecha, e.nombre,
+        e.dieta_media ? 'Sí' : '', e.dieta_completa ? 'Sí' : '',
+        importeDieta > 0 ? importeDieta : '',
+        e.horas_extra ? (e.horas_extra_amt || '') : '', e.horas_nocturnas ? (e.horas_nocturnas_amt || '') : '',
+        e.baja ? 'Sí' : '', e.vacaciones ? 'Sí' : '', e.permiso ? 'Sí' : '',
+        e.asuntos_propios ? 'Sí' : '', e.curso ? 'Sí' : '',
+        e.cedido_rd ? 'Sí' : '', e.cedido_fg ? 'Sí' : '', e.cedido_ra ? 'Sí' : '',
+        e.reconocimiento ? 'Sí' : '', e.jefe_provisional ? 'Sí' : '', e.conductor_provisional ? 'Sí' : '',
+        e.falta ? 'Sí' : '', e.falta ? (e.falta_txt || '') : '',
+        e.notas || ''
+      ]);
+    });
+  });
+
+  const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [headers.map(escape).join(','), ...rows.map(r => r.map(escape).join(','))].join('\n');
+  const BOM = '\uFEFF';
+  const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `control-personal-${scope}-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast('✅ CSV exportado');
+}
+
+// ── CLOUD GIST ──────────────────────────────────────────────────
+function setCloudStatus(ok, msg) {
+  const wrap = document.getElementById('cloud-status');
+  const dot = document.getElementById('cloud-dot');
+  const txt = document.getElementById('cloud-status-text');
+  wrap.style.display = 'flex';
+  dot.className = 'cloud-dot' + (ok ? '' : ' off');
+  txt.textContent = msg;
+}
+
+async function subirNube(silencioso = false) {
+  const token = document.getElementById('gh-token').value.trim();
+  if (!token) { showToast('⚠️ Introduce el GitHub Token', 'warn'); return; }
+  const payload = { registros: getData(), empleados: getEmpleados(), config: getConfig() };
+  const body = JSON.stringify(payload, null, 2);
+  let gistId = document.getElementById('gh-gist-id').value.trim();
+  setCloudStatus(false, 'Subiendo...');
+  try {
+    let res, json;
+    if (gistId) {
+      res = await fetch(`https://api.github.com/gists/${gistId}`, { method: 'PATCH', headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ files: { [GIST_FILENAME]: { content: body } } }) });
+    } else {
+      res = await fetch('https://api.github.com/gists', { method: 'POST', headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ description: 'Control de Personal - Datos', public: false, files: { [GIST_FILENAME]: { content: body } } }) });
+    }
+    json = await res.json();
+    if (!res.ok) throw new Error(json.message);
+    gistId = json.id;
+    document.getElementById('gh-gist-id').value = gistId;
+    localStorage.setItem('gistid-personal', gistId);
+    setCloudStatus(true, `Datos subidos · Gist: ${gistId}`);
+    if (!silencioso) showToast('✅ Datos sincronizados en la nube');
+    else showToast('☁️ Guardado y sincronizado');
+  } catch(err) { setCloudStatus(false, 'Error: ' + err.message); showToast('⚠️ Error al subir: ' + err.message, 'warn'); }
+}
+
+async function bajarNube() {
+  const token = document.getElementById('gh-token').value.trim();
+  const gistId = document.getElementById('gh-gist-id').value.trim() || localStorage.getItem('gistid-personal');
+  if (!token || !gistId) { showToast('⚠️ Introduce Token y Gist ID', 'warn'); return; }
+  setCloudStatus(false, 'Descargando...');
+  try {
+    const res = await fetch(`https://api.github.com/gists/${gistId}`, { headers: { 'Authorization': `token ${token}` } });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message);
+    const content = json.files[GIST_FILENAME]?.content;
+    if (!content) throw new Error('Archivo no encontrado en el Gist');
+    const imp = JSON.parse(content);
+    if (imp.registros) saveData(imp.registros);
+    if (imp.empleados) saveEmpleados(imp.empleados);
+    if (imp.config) saveConfig(imp.config);
+    document.getElementById('gh-gist-id').value = gistId;
+    localStorage.setItem('gistid-personal', gistId);
+    setCloudStatus(true, `${imp.registros?.length || 0} registros descargados`);
+    showToast(`✅ Datos descargados de la nube`);
+    renderEmpleadosGrid(); renderResumen();
+  } catch(err) { setCloudStatus(false, 'Error: ' + err.message); showToast('⚠️ Error al descargar: ' + err.message, 'warn'); }
+}
+
+
+// ── COMPARTIR WHATSAPP ───────────────────────────────────────────
+function generarTextoWhatsApp() {
+  const mes = parseInt(document.getElementById('filter-mes').value);
+  const anio = parseInt(document.getElementById('filter-anio').value);
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const data = getData().filter(d => {
+    const dt = new Date(d.fecha + 'T00:00:00');
+    return dt.getMonth() === mes && dt.getFullYear() === anio;
+  });
+
+  const empleados = getEmpleados();
+  const cfg = getConfig();
+  const lineas = [];
+  lineas.push(`📋 RESUMEN ${meses[mes].toUpperCase()} ${anio}`);
+  lineas.push('');
+
+  let hayAlgo = false;
+  empleados.forEach(nombre => {
+    const items = [];
+    let totalDietas = 0, totalExtra = 0, totalNocturnas = 0;
+    data.forEach(d => {
+      const e = d.empleados.find(x => x.nombre === nombre);
+      if (!e) return;
+      const partes = [];
+      if (e.dieta_media) { partes.push('Media Dieta'); totalDietas++; }
+      if (e.dieta_completa) { partes.push(`Dieta Completa${e.dieta_completa_amt ? ' (' + e.dieta_completa_amt + '€)' : ''}`); totalDietas++; }
+      if (e.horas_extra && e.horas_extra_amt > 0) { partes.push(`${e.horas_extra_amt}h Extra`); totalExtra += e.horas_extra_amt; }
+      if (e.horas_nocturnas && e.horas_nocturnas_amt > 0) { partes.push(`${e.horas_nocturnas_amt}h Nocturna`); totalNocturnas += e.horas_nocturnas_amt; }
+      if (partes.length) items.push(`  • ${formatDate(d.fecha)} — ${partes.join(' · ')}`);
+    });
+    if (items.length) {
+      hayAlgo = true;
+      lineas.push(`👷 ${nombre.toUpperCase()}`);
+      const totales = [];
+      if (totalDietas > 0) totales.push(`Total Dietas: ${totalDietas}`);
+      if (totalExtra > 0) totales.push(`Total H. Extra: ${totalExtra}`);
+      if (totalNocturnas > 0) totales.push(`Total H. Nocturnas: ${totalNocturnas}`);
+      if (totales.length) lineas.push(`  📌 ${totales.join(' · ')}`);
+      items.forEach(i => lineas.push(i));
+      lineas.push('');
+    }
+  });
+
+  if (!hayAlgo) return null;
+  return lineas.join('\n').trim();
+}
+
+function copiarWhatsApp() {
+  const texto = generarTextoWhatsApp();
+  if (!texto) { showToast('⚠️ Sin dietas ni horas este mes', 'warn'); return; }
+  navigator.clipboard.writeText(texto).then(() => {
+    showToast('✅ Texto copiado — pégalo en WhatsApp');
+  }).catch(() => {
+    // Fallback para móviles sin clipboard API
+    const ta = document.createElement('textarea');
+    ta.value = texto;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('✅ Texto copiado — pégalo en WhatsApp');
+  });
+}
+
+function compartirWhatsApp() {
+  const texto = generarTextoWhatsApp();
+  if (!texto) { showToast('⚠️ Sin dietas ni horas este mes', 'warn'); return; }
+  if (navigator.share) {
+    navigator.share({ text: texto }).catch(() => {});
+  } else {
+    // Fallback: abrir WhatsApp Web
+    const url = 'https://wa.me/?text=' + encodeURIComponent(texto);
+    window.open(url, '_blank');
+  }
+}
+
+// ── BORRAR TODO ─────────────────────────────────────────────────
+function borrarTodo() {
+  if (!confirm('⚠️ ¿Borrar TODOS los datos? Esta acción no se puede deshacer.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  showToast('🗑 Todos los datos eliminados');
+  renderResumen();
+}
+</script>
+</body>
+</html>
