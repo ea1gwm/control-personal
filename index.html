@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Control de Personal v5</title>
+<title>Control de Personal v6</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -235,6 +235,11 @@
           <div class="db-icon">⬇️</div>
           <div class="db-title">Exportar JSON</div>
           <div class="db-desc">Descarga todos los datos en un archivo .json.</div>
+        </button>
+        <button class="data-btn blue" onclick="compartirJSON()">
+          <div class="db-icon">📤</div>
+          <div class="db-title">Compartir JSON</div>
+          <div class="db-desc">Comparte el archivo por Drive, WhatsApp, email u otras apps.</div>
         </button>
         <button class="data-btn blue" onclick="document.getElementById('import-input').click()">
           <div class="db-icon">⬆️</div>
@@ -948,6 +953,31 @@ function compartirWhatsApp() {
     const url = 'https://wa.me/?text=' + encodeURIComponent(texto);
     window.open(url, '_blank');
   }
+}
+
+
+// ── COMPARTIR JSON ───────────────────────────────────────────────
+async function compartirJSON() {
+  const payload = { registros: getData(), empleados: getEmpleados(), config: getConfig() };
+  const json = JSON.stringify(payload, null, 2);
+  const filename = `control-personal-${new Date().toISOString().split('T')[0]}.json`;
+
+  if (navigator.share && navigator.canShare) {
+    try {
+      const file = new File([json], filename, { type: 'application/json' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename });
+        return;
+      }
+    } catch(e) {}
+  }
+  // Fallback: descargar normal
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  a.click(); URL.revokeObjectURL(url);
+  showToast('⬇️ JSON descargado');
 }
 
 // ── BORRAR TODO ─────────────────────────────────────────────────
