@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Control de Personal v6</title>
+<title>Control de Personal v7</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -962,16 +962,21 @@ async function compartirJSON() {
   const json = JSON.stringify(payload, null, 2);
   const filename = `control-personal-${new Date().toISOString().split('T')[0]}.json`;
 
-  if (navigator.share && navigator.canShare) {
+  if (navigator.share) {
     try {
-      const file = new File([json], filename, { type: 'application/json' });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: filename });
+      const file = new File([json], filename, { type: 'text/plain' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Backup Control de Personal', text: filename });
         return;
       }
-    } catch(e) {}
+      await navigator.share({ title: 'Backup Control de Personal', text: json });
+      return;
+    } catch(e) {
+      if (e.name !== 'AbortError') {
+        // Fallback descarga
+      } else { return; }
+    }
   }
-  // Fallback: descargar normal
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
