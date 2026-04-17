@@ -1,0 +1,12 @@
+{
+  "name": "Control de Personal",
+  "short_name": "Personal",
+  "description": "Control de dietas, horas y incidencias del equipo",
+  "start_url": "/control-personal/",
+  "scope": "/control-personal/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait-primary",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
