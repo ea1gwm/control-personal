@@ -146,11 +146,23 @@
       const swCode = `
         const CACHE='cp-v1';
         self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.add(self.location.href)).then(() => self.skipWaiting())); });
-        self.addEventListener('activate', e => { e.waitUntil(clients.claim()); });
+        self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>clients.claim())); });
         self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))); });
+        self.addEventListener('message', e => { if(e.data==='skipWaiting') self.skipWaiting(); });
       `;
       const swBlob = new Blob([swCode], { type: 'application/javascript' });
-      navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
+      navigator.serviceWorker.register(URL.createObjectURL(swBlob)).then(reg => {
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          nw.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+              _waitingWorker = nw;
+              document.getElementById('update-banner').style.display = 'flex';
+            }
+          });
+        });
+      }).catch(() => {});
+      navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
     }
   </script>
 </head>
@@ -338,6 +350,19 @@
     </div>
   </div>
 
+</div>
+
+<!-- UPDATE BANNER -->
+<div id="update-banner" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:10000;align-items:center;justify-content:center;">
+  <div style="background:#161b22;border:2px solid #f59e0b;border-radius:1.25rem;padding:2rem 2.25rem;max-width:380px;width:92%;box-shadow:0 24px 60px rgba(0,0,0,.6);text-align:center;">
+    <div style="font-size:2.5rem;margin-bottom:.75rem;">⚙️</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:2px;color:#f59e0b;margin-bottom:.5rem;">Nueva versión disponible</div>
+    <div style="font-size:.85rem;color:#8b949e;margin-bottom:1.5rem;line-height:1.6;">Hay una actualización de Control de Personal lista para instalar.</div>
+    <div style="display:flex;gap:.75rem;justify-content:center;">
+      <button onclick="document.getElementById('update-banner').style.display='none'" style="background:#30363d;color:#e6edf3;border:none;padding:.6rem 1.2rem;border-radius:.5rem;font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:600;cursor:pointer;">Ahora no</button>
+      <button onclick="applyUpdate()" style="background:#f59e0b;color:#000;border:none;padding:.6rem 1.4rem;border-radius:.5rem;font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:700;cursor:pointer;">⬆ Actualizar ahora</button>
+    </div>
+  </div>
 </div>
 
 <div id="toast" class="toast"></div>
@@ -1035,6 +1060,28 @@ function borrarTodo() {
   renderResumen();
 }
 
+// ── ACTUALIZACIÓN ───────────────────────────────────────────────
+let _waitingWorker = null;
+function applyUpdate() {
+  document.getElementById('update-banner').style.display = 'none';
+  if (_waitingWorker) _waitingWorker.postMessage('skipWaiting');
+  else window.location.reload();
+}
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.ready.then(reg => {
+    if (reg.waiting) { _waitingWorker = reg.waiting; document.getElementById('update-banner').style.display = 'flex'; }
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing;
+      nw.addEventListener('statechange', () => {
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+          _waitingWorker = nw;
+          document.getElementById('update-banner').style.display = 'flex';
+        }
+      });
+    });
+  });
+}
+
 // ════════════════════════════════════════════════════════════════════
 // GOOGLE DRIVE SYNC
 // ════════════════════════════════════════════════════════════════════
@@ -1240,7 +1287,7 @@ async function driveAutoRestore() {
 </script>
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v1.0
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v1.1
   </span>
 </footer>
 </body>
