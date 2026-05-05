@@ -143,9 +143,14 @@
   <meta name="theme-color" content="#f59e0b">
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(() => {});
-      });
+      const swCode = `
+        const CACHE='cp-v1';
+        self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.add(self.location.href)).then(() => self.skipWaiting())); });
+        self.addEventListener('activate', e => { e.waitUntil(clients.claim()); });
+        self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))); });
+      `;
+      const swBlob = new Blob([swCode], { type: 'application/javascript' });
+      navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
     }
   </script>
 </head>
@@ -299,6 +304,27 @@
       </div>
     </div>
 
+    <!-- GOOGLE DRIVE -->
+    <div class="card">
+      <div class="card-title"><span>🟢</span> Sincronización Google Drive</div>
+      <p class="sync-info">Con el Client ID configurado, <strong style="color:var(--accent3)">cada día guardado se sube automáticamente</strong> a tu Drive y se descarga al abrir la app en cualquier dispositivo.<br>
+      Obtén el Client ID en <strong style="color:var(--accent3)">console.cloud.google.com</strong> → APIs → Credenciales → OAuth 2.0 → origen: <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">https://ea1gwm.github.io</code></p>
+      <div style="margin-top:14px">
+        <label>Client ID de Google</label>
+        <input type="text" id="drive-client-id" placeholder="xxxxx.apps.googleusercontent.com" oninput="saveDriveClientId()" style="margin-top:6px">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
+        <button class="cloud-sync-btn" id="btn-drive-login" onclick="driveSignIn()">🔑 CONECTAR CON GOOGLE</button>
+        <button class="cloud-sync-btn" id="btn-drive-upload" style="display:none" onclick="driveUpload()">☁ SUBIR AHORA</button>
+        <button class="cloud-sync-btn secondary" id="btn-drive-download" style="display:none" onclick="driveDownload()">⬇ DESCARGAR AHORA</button>
+        <button class="cloud-sync-btn secondary" id="btn-drive-logout" style="display:none;color:var(--danger)" onclick="driveSignOut()">✕ DESCONECTAR</button>
+      </div>
+      <div class="cloud-status" id="drive-status" style="display:none">
+        <div class="cloud-dot off" id="drive-dot"></div>
+        <span id="drive-status-text"></span>
+      </div>
+    </div>
+
     <!-- PELIGRO -->
     <div class="card">
       <div class="card-title" style="color:var(--danger)"><span>⚠️</span> Zona Peligrosa</div>
@@ -357,6 +383,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderEmpleadosAdmin();
   renderEmpleadosGrid();
   renderResumen();
+  // Reconectar Drive si había sesión activa
+  driveAutoRestore();
 });
 
 // ── DATA ────────────────────────────────────────────────────────
@@ -534,14 +562,14 @@ function guardarDia() {
   saveData(data);
   showToast('✅ Día guardado correctamente');
   renderResumen();
+  // Auto-sync Gist si checkbox marcado
   if (document.getElementById('cb-autosync') && document.getElementById('cb-autosync').checked) {
     const token = document.getElementById('gh-token').value.trim();
-    if (token) {
-      subirNube(true);
-    } else {
-      showToast('⚠️ Para sincronizar automáticamente introduce el token en Datos → Nube', 'warn');
-    }
+    if (token) subirNube(true);
+    else showToast('⚠️ Para Gist introduce el token en Datos → Nube', 'warn');
   }
+  // Auto-sync Drive si conectado
+  if (_cpReady) driveUpload(true);
 }
 
 // ── RESUMEN MENSUAL ─────────────────────────────────────────────
@@ -1000,10 +1028,220 @@ async function compartirJSON() {
 // ── BORRAR TODO ─────────────────────────────────────────────────
 function borrarTodo() {
   if (!confirm('⚠️ ¿Borrar TODOS los datos? Esta acción no se puede deshacer.')) return;
+  if (!confirm('Segunda confirmación: ¿Borrar TODO permanentemente?')) return;
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(STORAGE_EMP);
   showToast('🗑 Todos los datos eliminados');
   renderResumen();
 }
+
+// ════════════════════════════════════════════════════════════════════
+// GOOGLE DRIVE SYNC
+// ════════════════════════════════════════════════════════════════════
+const DRIVE_SCOPE_CP   = 'https://www.googleapis.com/auth/drive.file';
+const DRIVE_FILE_CP    = 'control_personal.json';
+let _cpToken     = null;
+let _cpFileId    = null;
+let _cpClient    = null;
+let _cpReady     = false;
+
+function saveDriveClientId() {
+  const cid = document.getElementById('drive-client-id').value.trim();
+  if (cid) localStorage.setItem('cp-driveClientId', cid);
+}
+
+function setDriveStatus(ok, msg) {
+  const wrap = document.getElementById('drive-status');
+  const dot  = document.getElementById('drive-dot');
+  const txt  = document.getElementById('drive-status-text');
+  wrap.style.display = 'flex';
+  dot.className = 'cloud-dot' + (ok ? '' : ' off');
+  txt.textContent = msg;
+}
+
+function setDriveUI(connected) {
+  document.getElementById('btn-drive-login').style.display    = connected ? 'none'   : '';
+  document.getElementById('btn-drive-upload').style.display   = connected ? ''       : 'none';
+  document.getElementById('btn-drive-download').style.display = connected ? ''       : 'none';
+  document.getElementById('btn-drive-logout').style.display   = connected ? ''       : 'none';
+  _cpReady = connected;
+}
+
+function loadGIS_CP() {
+  return new Promise((res, rej) => {
+    if (window.google?.accounts?.oauth2) { res(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.onload = res; s.onerror = () => rej(new Error('No se pudo cargar Google'));
+    document.head.appendChild(s);
+  });
+}
+
+async function driveSignIn() {
+  const clientId = document.getElementById('drive-client-id').value.trim()
+                || localStorage.getItem('cp-driveClientId');
+  if (!clientId) { showToast('⚠️ Introduce el Client ID de Google', 'warn'); return; }
+  localStorage.setItem('cp-driveClientId', clientId);
+  try { await loadGIS_CP(); } catch(e) { showToast('⚠️ Error cargando Google', 'warn'); return; }
+
+  _cpClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: DRIVE_SCOPE_CP,
+    callback: async (resp) => {
+      if (resp.error) { showToast('⚠️ Error Google: ' + resp.error, 'warn'); return; }
+      _cpToken = resp.access_token;
+      localStorage.setItem('cp-driveToken', _cpToken);
+      localStorage.setItem('cp-driveTokenExp', Date.now() + (resp.expires_in - 60) * 1000);
+      setDriveUI(true);
+      setDriveStatus(false, 'Conectado — buscando archivo en Drive…');
+      await cpFindOrCreate();
+      showToast('✅ Google Drive conectado');
+    }
+  });
+  _cpClient.requestAccessToken({ prompt: 'consent' });
+}
+
+async function cpEnsureToken() {
+  const exp = parseInt(localStorage.getItem('cp-driveTokenExp') || '0');
+  if (_cpToken && Date.now() < exp) return true;
+  return new Promise(res => {
+    if (!_cpClient) { res(false); return; }
+    _cpClient.callback = (resp) => {
+      if (resp.error) { res(false); return; }
+      _cpToken = resp.access_token;
+      localStorage.setItem('cp-driveToken', _cpToken);
+      localStorage.setItem('cp-driveTokenExp', Date.now() + (resp.expires_in - 60) * 1000);
+      res(true);
+    };
+    _cpClient.requestAccessToken({ prompt: '' });
+  });
+}
+
+async function cpFetch(url, opts = {}) {
+  await cpEnsureToken();
+  if (!_cpToken) throw new Error('No autenticado');
+  opts.headers = { ...(opts.headers || {}), 'Authorization': 'Bearer ' + _cpToken };
+  const res = await fetch(url, opts);
+  if (!res.ok) throw new Error('Drive API HTTP ' + res.status);
+  return res;
+}
+
+async function cpFindOrCreate() {
+  const q   = encodeURIComponent(`name='${DRIVE_FILE_CP}' and trashed=false`);
+  const res = await cpFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,modifiedTime)&spaces=drive`);
+  const json = await res.json();
+  if (json.files && json.files.length > 0) {
+    _cpFileId = json.files[0].id;
+    localStorage.setItem('cp-driveFileId', _cpFileId);
+    setDriveStatus(true, 'Conectado ✓  ·  Modificado: ' + new Date(json.files[0].modifiedTime).toLocaleString('es'));
+  } else {
+    await cpCreateFile();
+    setDriveStatus(true, 'Conectado ✓  ·  Archivo nuevo creado en Drive');
+  }
+}
+
+async function cpCreateFile() {
+  const meta    = JSON.stringify({ name: DRIVE_FILE_CP, mimeType: 'application/json' });
+  const payload = JSON.stringify({ registros: getData(), empleados: getEmpleados(), config: getConfig() });
+  const form    = new FormData();
+  form.append('metadata', new Blob([meta],    { type: 'application/json' }));
+  form.append('file',     new Blob([payload], { type: 'application/json' }));
+  const res  = await cpFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', { method: 'POST', body: form });
+  const json = await res.json();
+  _cpFileId = json.id;
+  localStorage.setItem('cp-driveFileId', _cpFileId);
+}
+
+async function driveUpload(silencioso = false) {
+  if (!_cpReady) { if (!silencioso) showToast('⚠️ Conecta primero con Google Drive', 'warn'); return; }
+  setDriveStatus(false, 'Subiendo…');
+  try {
+    const payload = JSON.stringify({ registros: getData(), empleados: getEmpleados(), config: getConfig() });
+    if (!_cpFileId) await cpCreateFile();
+    else await cpFetch(`https://www.googleapis.com/upload/drive/v3/files/${_cpFileId}?uploadType=media`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: payload
+    });
+    const now = new Date().toLocaleString('es');
+    setDriveStatus(true, 'Sincronizado ✓  ·  ' + now);
+    if (!silencioso) showToast('✅ Subido a Drive');
+    else showToast('☁️ Guardado y sincronizado con Drive');
+  } catch(e) { setDriveStatus(false, 'Error: ' + e.message); if (!silencioso) showToast('⚠️ Error Drive: ' + e.message, 'warn'); }
+}
+
+async function driveDownload() {
+  if (!_cpReady) { showToast('⚠️ Conecta primero con Google Drive', 'warn'); return; }
+  setDriveStatus(false, 'Descargando…');
+  try {
+    if (!_cpFileId) await cpFindOrCreate();
+    const res  = await cpFetch(`https://www.googleapis.com/drive/v3/files/${_cpFileId}?alt=media`);
+    const json = await res.json();
+    if (!confirm(`Descargar datos de Drive (${json.registros?.length || 0} registros)? Se reemplazarán los datos locales.`)) { setDriveStatus(true, 'Cancelado'); return; }
+    if (json.registros) saveData(json.registros);
+    if (json.empleados) saveEmpleados(json.empleados);
+    if (json.config)    saveConfig(json.config);
+    renderEmpleadosGrid(); renderResumen();
+    setDriveStatus(true, 'Descargado ✓  ·  ' + new Date().toLocaleString('es'));
+    showToast('✅ Datos descargados de Drive');
+  } catch(e) { setDriveStatus(false, 'Error: ' + e.message); showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
+function driveSignOut() {
+  _cpToken = null; _cpFileId = null; _cpReady = false; _cpClient = null;
+  localStorage.removeItem('cp-driveToken');
+  localStorage.removeItem('cp-driveTokenExp');
+  localStorage.removeItem('cp-driveFileId');
+  setDriveUI(false);
+  document.getElementById('drive-status').style.display = 'none';
+  showToast('✅ Desconectado de Drive');
+}
+
+async function driveAutoRestore() {
+  const clientId = localStorage.getItem('cp-driveClientId');
+  const token    = localStorage.getItem('cp-driveToken');
+  const exp      = parseInt(localStorage.getItem('cp-driveTokenExp') || '0');
+  const fileId   = localStorage.getItem('cp-driveFileId');
+  const el       = document.getElementById('drive-client-id');
+  if (clientId && el) el.value = clientId;
+  if (!clientId || !token || Date.now() > exp) return;
+  _cpToken = token; _cpFileId = fileId || null;
+  try {
+    await loadGIS_CP();
+    _cpClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId, scope: DRIVE_SCOPE_CP,
+      callback: (resp) => {
+        if (resp.error) return;
+        _cpToken = resp.access_token;
+        localStorage.setItem('cp-driveToken', _cpToken);
+        localStorage.setItem('cp-driveTokenExp', Date.now() + (resp.expires_in - 60) * 1000);
+      }
+    });
+    setDriveUI(true);
+    setDriveStatus(false, 'Reconectado — sincronizando…');
+    if (_cpFileId) {
+      const res  = await cpFetch(`https://www.googleapis.com/drive/v3/files/${_cpFileId}?alt=media`);
+      const json = await res.json();
+      const local = getData();
+      const driveNewer = json.registros && (
+        json.registros.length > local.length ||
+        (json.registros.length > 0 && local.length > 0 &&
+         json.registros[json.registros.length-1].fecha > local[local.length-1].fecha)
+      );
+      if (driveNewer) {
+        if (json.registros) saveData(json.registros);
+        if (json.empleados) saveEmpleados(json.empleados);
+        if (json.config)    saveConfig(json.config);
+        renderEmpleadosGrid(); renderResumen();
+        showToast('☁️ Datos sincronizados desde Drive');
+      }
+      setDriveStatus(true, 'Conectado ✓  ·  Sync: ' + new Date().toLocaleString('es'));
+    }
+  } catch(e) { setDriveUI(false); }
+}
 </script>
+<footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
+  <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v1.0
+  </span>
+</footer>
 </body>
 </html>
