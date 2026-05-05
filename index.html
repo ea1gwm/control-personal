@@ -190,13 +190,7 @@
           <label>Fecha</label>
           <input type="date" id="inp-fecha">
         </div>
-        <div class="form-group" style="justify-content:flex-end">
-          <label>&nbsp;</label>
-          <div class="check-group" id="cg-autosync" style="border-color:var(--accent3)">
-            <input type="checkbox" id="cb-autosync">
-            <label for="cb-autosync" style="color:var(--accent3)">☁️ Sincronizar con nube al guardar</label>
-          </div>
-        </div>
+
       </div>
     </div>
 
@@ -587,12 +581,6 @@ function guardarDia() {
   saveData(data);
   showToast('✅ Día guardado correctamente');
   renderResumen();
-  // Auto-sync Gist si checkbox marcado
-  if (document.getElementById('cb-autosync') && document.getElementById('cb-autosync').checked) {
-    const token = document.getElementById('gh-token').value.trim();
-    if (token) subirNube(true);
-    else showToast('⚠️ Para Gist introduce el token en Datos → Nube', 'warn');
-  }
   // Auto-sync Drive si conectado
   if (_cpReady) driveUpload(true);
 }
@@ -1287,7 +1275,7 @@ async function driveAutoRestore() {
 </script>
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v1.1
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v1.2
   </span>
 </footer>
 </body>
