@@ -292,26 +292,6 @@
 
     <!-- NUBE GIST -->
     <div class="card">
-      <div class="card-title"><span>☁️</span> Sincronización en la Nube (GitHub Gist)</div>
-      <p class="sync-info">1. Ve a <strong style="color:var(--accent3)">github.com/settings/tokens</strong> → genera un token con permiso <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">gist</code><br>
-      2. Pega el token aquí. La primera vez se crea el Gist automáticamente.<br>
-      3. Guarda el Gist ID que aparece — introdúcelo en otros dispositivos para sincronizar.</p>
-      <div class="inp-cloud" style="flex-wrap:wrap;gap:8px;margin-top:14px">
-        <input type="password" id="gh-token" placeholder="GitHub Token (ghp_...)" style="min-width:200px;flex:2">
-        <input type="text" id="gh-gist-id" placeholder="Gist ID (opcional)" style="min-width:160px;flex:1">
-      </div>
-      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button class="cloud-sync-btn" onclick="subirNube()">SUBIR DATOS</button>
-        <button class="cloud-sync-btn secondary" onclick="bajarNube()">DESCARGAR DE NUBE</button>
-      </div>
-      <div class="cloud-status" id="cloud-status" style="display:none">
-        <div class="cloud-dot" id="cloud-dot"></div>
-        <span id="cloud-status-text"></span>
-      </div>
-    </div>
-
-    <!-- GOOGLE DRIVE -->
-    <div class="card">
       <div class="card-title"><span>🟢</span> Sincronización Google Drive</div>
       <p class="sync-info">Con el Client ID configurado, <strong style="color:var(--accent3)">cada día guardado se sube automáticamente</strong> a tu Drive y se descarga al abrir la app en cualquier dispositivo.<br>
       Obtén el Client ID en <strong style="color:var(--accent3)">console.cloud.google.com</strong> → APIs → Credenciales → OAuth 2.0 → origen: <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">https://ea1gwm.github.io</code></p>
@@ -1082,7 +1062,10 @@ let _cpReady     = false;
 
 function saveDriveClientId() {
   const cid = document.getElementById('drive-client-id').value.trim();
-  if (cid) localStorage.setItem('cp-driveClientId', cid);
+  if (cid) {
+    localStorage.setItem('cp-driveClientId', cid);
+    sessionStorage.setItem('cp-driveClientId', cid); // doble respaldo
+  }
 }
 
 function setDriveStatus(ok, msg) {
@@ -1127,6 +1110,8 @@ async function driveSignIn() {
       _cpToken = resp.access_token;
       localStorage.setItem('cp-driveToken', _cpToken);
       localStorage.setItem('cp-driveTokenExp', Date.now() + (resp.expires_in - 60) * 1000);
+      sessionStorage.setItem('cp-driveToken', _cpToken);
+      sessionStorage.setItem('cp-driveTokenExp', String(Date.now() + (resp.expires_in - 60) * 1000));
       setDriveUI(true);
       setDriveStatus(false, 'Conectado — buscando archivo en Drive…');
       await cpFindOrCreate();
@@ -1231,11 +1216,15 @@ function driveSignOut() {
 }
 
 async function driveAutoRestore() {
-  const clientId = localStorage.getItem('cp-driveClientId');
-  const token    = localStorage.getItem('cp-driveToken');
-  const exp      = parseInt(localStorage.getItem('cp-driveTokenExp') || '0');
+  // Intentar localStorage, con fallback a sessionStorage
+  const clientId = localStorage.getItem('cp-driveClientId') || sessionStorage.getItem('cp-driveClientId');
+  const token    = localStorage.getItem('cp-driveToken')    || sessionStorage.getItem('cp-driveToken');
+  const exp      = parseInt(localStorage.getItem('cp-driveTokenExp') || sessionStorage.getItem('cp-driveTokenExp') || '0');
   const fileId   = localStorage.getItem('cp-driveFileId');
-  const el       = document.getElementById('drive-client-id');
+  // Asegurar que están en localStorage también
+  if (clientId) localStorage.setItem('cp-driveClientId', clientId);
+  if (token)    localStorage.setItem('cp-driveToken', token);
+  const el = document.getElementById('drive-client-id');
   if (clientId && el) el.value = clientId;
   if (!clientId || !token || Date.now() > exp) return;
   _cpToken = token; _cpFileId = fileId || null;
@@ -1275,7 +1264,7 @@ async function driveAutoRestore() {
 </script>
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v1.2
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v1.3
   </span>
 </footer>
 </body>
