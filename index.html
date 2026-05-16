@@ -356,7 +356,7 @@
 
     <!-- HISTORIAL DE CAMBIOS -->
     <div class="card" id="audit-card" style="display:none">
-      <div class="card-title"><span>📜</span> Historial de cambios</div>
+      <div class="card-title"><span>📜</span> Historial de cambios <span id="audit-badge" style="display:none;background:#ef4444;color:#fff;font-size:.65rem;border-radius:999px;padding:1px 6px;margin-left:.4rem;font-weight:700">NUEVO</span></div>
       <div id="audit-list" style="max-height:340px;overflow-y:auto"></div>
     </div>
 
@@ -838,15 +838,30 @@ function renderResumen() {
 function eliminarDiaCP(fecha) {
   if (!confirm('¿Mover el registro del ' + fecha + ' a la papelera? Se podrá recuperar durante 30 días.')) return;
   (async () => {
-    if (_fbAuth?.currentUser && _teamId && _registroDocs[fecha]) {
-      await fbSoftDelete(fecha);
-      showToast('🗑 Movido a papelera');
-    } else {
-      const data = getData().filter(d => d.fecha !== fecha);
-      saveData(data);
-      showToast('🗑 Registro eliminado');
-      renderResumen();
+    if (_fbAuth?.currentUser && _teamId) {
+      // Si no tenemos el ID en caché, buscarlo en Firestore directamente
+      let regId = _registroDocs[fecha];
+      if (!regId) {
+        try {
+          const snap = await _fbDb.collection('teams').doc(_teamId).collection('registros')
+            .where('fecha', '==', fecha).where('deleted', '==', false).limit(1).get();
+          if (!snap.empty) {
+            regId = snap.docs[0].id;
+            _registroDocs[fecha] = regId;
+          }
+        } catch(e) { console.warn('Firestore lookup:', e); }
+      }
+      if (regId) {
+        await fbSoftDelete(fecha);
+        showToast('🗑 Movido a papelera');
+        return;
+      }
     }
+    // Fallback: eliminar solo local
+    const data = getData().filter(d => d.fecha !== fecha);
+    saveData(data);
+    showToast('🗑 Registro eliminado (local)');
+    renderResumen();
   })();
 }
 
@@ -1215,7 +1230,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ════════════════════════════════════════════════════════════
-// FIREBASE v3.2 — Equipos compartidos, roles, audit, papelera
+// FIREBASE v3.3 — Equipos compartidos, roles, audit, papelera
 // ════════════════════════════════════════════════════════════
 const FB_CONFIG_KEY  = 'firebaseConfig';
 const APP_TYPE       = 'controlpersonal';
@@ -1454,6 +1469,9 @@ function subscribeToTeam(teamId) {
     _unsubAdminNotes = _fbDb.collection('teams').doc(teamId).collection('adminPrivate').doc('notes').onSnapshot(doc => {
       _adminNotes = doc.exists ? (doc.data().notes || {}) : {};
       renderAdminNotes();
+      // Si el panel lateral está abierto, actualizarlo también
+      const panel = document.getElementById('notas-admin-panel');
+      if (panel && panel.style.display !== 'none') renderAdminNotesPanel();
     }, err => { _adminNotes = {}; renderAdminNotes(); });
   }
 
@@ -1577,11 +1595,16 @@ async function fbDeleteAdminNote(empleado, idx) {
   if (!confirm('¿Borrar esta nota?')) return;
   const empNotes = [...(_adminNotes[empleado] || [])];
   empNotes.splice(idx, 1);
+  // Actualizar local inmediatamente
+  _adminNotes = { ..._adminNotes, [empleado]: empNotes };
+  renderAdminNotesPanel();
+  renderAdminNotes && renderAdminNotes();
+  showToast('✅ Nota eliminada');
   try {
     await _fbDb.collection('teams').doc(_teamId).collection('adminPrivate').doc('notes').set({
-      notes: { ..._adminNotes, [empleado]: empNotes }
+      notes: _adminNotes,
+      modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
-    showToast('✅ Nota eliminada');
   } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
 }
 
@@ -1618,7 +1641,7 @@ function renderAdminNotes() {
 }
 
 async function logAudit(action, details = {}) {
-  if (!_currentUser || !_teamId) return;
+  if (!_currentUser || !_teamId || !_fbDb) return;
   try {
     await _fbDb.collection('teams').doc(_teamId).collection('audit').add({
       action,
@@ -1627,7 +1650,10 @@ async function logAudit(action, details = {}) {
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
       ...details
     });
-  } catch(e) {}
+    // Indicador visual de nueva entrada en historial
+    const badge = document.getElementById('audit-badge');
+    if (badge) { badge.style.display = 'inline'; setTimeout(() => badge.style.display = 'none', 5000); }
+  } catch(e) { console.warn('logAudit error:', e); }
 }
 
 // ═══════════════════════════════════════════════
@@ -1971,17 +1997,19 @@ async function addNoteFromPanel(emp) {
   if (!ta || !ta.value.trim()) return;
   const text = ta.value.trim();
   const newEntry = { text, timestamp: new Date().toISOString(), by: _currentUser?.email || 'admin' };
-  const empNotes = _adminNotes[emp] || [];
+  const empNotes = [...(_adminNotes[emp] || [])];
   empNotes.unshift(newEntry);
+  // Actualizar local inmediatamente para que renderice sin esperar Firestore
+  _adminNotes = { ..._adminNotes, [emp]: empNotes };
+  ta.value = '';
+  renderAdminNotesPanel();
+  showToast('✅ Nota añadida');
   try {
     await _fbDb.collection('teams').doc(_teamId).collection('adminPrivate').doc('notes').set({
-      notes: { ..._adminNotes, [emp]: empNotes },
+      notes: _adminNotes,
       modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
-    ta.value = '';
-    showToast('✅ Nota añadida');
-    renderAdminNotesPanel();
-  } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+  } catch(e) { showToast('⚠️ Error guardando: ' + e.message, 'warn'); }
 }
 
 function showHelp() {
@@ -2050,7 +2078,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v3.0
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v3.3
   </span>
 </footer>
 </body>
