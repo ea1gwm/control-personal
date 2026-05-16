@@ -135,6 +135,22 @@
     .emp-fields { grid-template-columns: 1fr 1fr; }
     header h1 { font-size: 20px; }
   }
+    /* ── TEMA CLARO ─────────────────────────────────────── */
+    body.theme-light {
+      --bg:        #f1f5f9;
+      --surface:   #ffffff;
+      --surface2:  #f8fafc;
+      --border:    #cbd5e1;
+      --text:      #1e293b;
+      --text2:     #334155;
+      --text3:     #64748b;
+    }
+    body.theme-light input, body.theme-light select, body.theme-light textarea {
+      background: #f8fafc; color: #1e293b; border-color: #cbd5e1;
+    }
+    body.theme-light .card { background: #fff; }
+    body.theme-light .header-bar { background: #fff; border-color: #cbd5e1; }
+    body.theme-light .tab-nav { background: #fff; border-color: #cbd5e1; }
 </style>
   <link rel="manifest" href="manifest.json">
   <meta name="mobile-web-app-capable" content="yes">
@@ -385,6 +401,16 @@
       </div>
     </div>
 
+    <!-- TEMA -->
+    <div class="card">
+      <div class="card-title"><span>🎨</span> Apariencia</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="cloud-sync-btn" id="theme-auto"  onclick="setTheme('auto')"  style="flex:1">🌗 Auto</button>
+        <button class="cloud-sync-btn" id="theme-dark"  onclick="setTheme('dark')"  style="flex:1">🌙 Oscuro</button>
+        <button class="cloud-sync-btn" id="theme-light" onclick="setTheme('light')" style="flex:1">☀️ Claro</button>
+      </div>
+    </div>
+
     <!-- PELIGRO -->
     <div class="card">
       <div class="card-title" style="color:var(--danger)"><span>⚠️</span> Zona Peligrosa</div>
@@ -456,6 +482,16 @@ document.addEventListener('DOMContentLoaded', () => {
   renderEmpleadosAdmin();
   renderEmpleadosGrid();
   renderResumen();
+  // Tema
+  const savedTheme = localStorage.getItem('theme') || 'auto';
+  applyTheme(savedTheme);
+  ['auto','dark','light'].forEach(m => {
+    const btn = document.getElementById('theme-' + m);
+    if (btn) btn.style.borderColor = m === savedTheme ? 'var(--accent)' : 'var(--border)';
+  });
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if ((localStorage.getItem('theme') || 'auto') === 'auto') applyTheme('auto');
+  });
   // Inicializar Firebase si está configurado
   firebaseAutoInit();
 });
@@ -876,10 +912,10 @@ function exportarJSON() {
   showToast('✅ JSON exportado');
 }
 
-function importarJSON(event) {
+async function importarJSON(event) {
   const file = event.target.files[0]; if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const imp = JSON.parse(e.target.result);
       if (imp.registros) saveData(imp.registros);
@@ -887,10 +923,35 @@ function importarJSON(event) {
       if (imp.config) saveConfig(imp.config);
       showToast('✅ Datos importados correctamente');
       renderEmpleadosGrid(); renderResumen();
+      // Subir a Firestore si hay sesión activa
+      if (_fbAuth?.currentUser && _teamId && imp.registros) {
+        showToast('☁️ Sincronizando con Firebase…');
+        await pushAllDataToFirestore(imp.registros);
+        // También settings
+        if (imp.empleados || imp.config) await fbSaveSettings().catch(()=>{});
+        showToast('✅ Todo sincronizado con Firebase');
+      }
     } catch { showToast('⚠️ Archivo JSON inválido', 'warn'); }
   };
   reader.readAsText(file);
   event.target.value = '';
+}
+
+async function pushAllDataToFirestore(arr) {
+  if (!_fbAuth?.currentUser || !_teamId || !_fbDb) return;
+  const now = firebase.firestore.FieldValue.serverTimestamp();
+  for (const r of arr) {
+    const existingId = _registroDocs[r.fecha];
+    const data = { ...r, deleted: false, modifiedBy: _currentUser.uid, modifiedByEmail: _currentUser.email, modifiedAt: now };
+    if (existingId) {
+      await _fbDb.collection('teams').doc(_teamId).collection('registros').doc(existingId).set(data, { merge: true });
+    } else {
+      data.createdBy = _currentUser.uid;
+      data.createdByEmail = _currentUser.email;
+      data.createdAt = now;
+      await _fbDb.collection('teams').doc(_teamId).collection('registros').add(data);
+    }
+  }
 }
 
 // ── EXPORT CSV ──────────────────────────────────────────────────
@@ -1133,7 +1194,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ════════════════════════════════════════════════════════════
-// FIREBASE v3.0 — Equipos compartidos, roles, audit, papelera
+// FIREBASE v3.1 — Equipos compartidos, roles, audit, papelera
 // ════════════════════════════════════════════════════════════
 const FB_CONFIG_KEY  = 'firebaseConfig';
 const APP_TYPE       = 'controlpersonal';
@@ -1823,6 +1884,25 @@ async function firebaseAutoInit() {
 // ═══════════════════════════════════════════════
 // AYUDA
 // ═══════════════════════════════════════════════
+// ── TEMA ─────────────────────────────────────────────
+function setTheme(mode) {
+  localStorage.setItem('theme', mode);
+  applyTheme(mode);
+  ['auto','dark','light'].forEach(m => {
+    const btn = document.getElementById('theme-' + m);
+    if (btn) btn.style.borderColor = m === mode ? 'var(--accent)' : 'var(--border)';
+  });
+}
+function applyTheme(mode) {
+  const body = document.body;
+  if (mode === 'light') body.classList.add('theme-light');
+  else if (mode === 'dark') body.classList.remove('theme-light');
+  else {
+    const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    body.classList.toggle('theme-light', !dark);
+  }
+}
+
 function showHelp() {
   document.getElementById('help-modal').style.display = 'flex';
 }
