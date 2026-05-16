@@ -197,6 +197,7 @@
   <button class="tab-btn active" onclick="switchTab('registro')">📋 Registro Diario</button>
   <button class="tab-btn" onclick="switchTab('resumen')">📊 Resumen Mensual</button>
   <button class="tab-btn" onclick="switchTab('datos')">💾 Datos</button>
+  <button class="tab-btn" id="btn-notas-admin" style="display:none;color:#f59e0b;background:transparent;border:none" onclick="toggleNotasAdmin()" title="Notas privadas">📓</button>
   <button class="tab-btn" style="margin-left:auto;color:var(--accent3);background:transparent;border:none" onclick="showHelp()" title="Ayuda">❓</button>
 </div>
 
@@ -672,15 +673,17 @@ async function guardarDia() {
   data.sort((a, b) => a.fecha.localeCompare(b.fecha));
   saveData(data);
 
-  // Sincronizar con Firestore si conectado
+  // Renderizar inmediatamente con datos locales
+  renderResumen();
+
+  // Sincronizar con Firestore en segundo plano
   if (_fbAuth?.currentUser && _teamId) {
     const ok = await fbSaveRegistro(entry);
     if (ok) showToast('✅ Día guardado y sincronizado');
-    else return;
+    else showToast('✅ Guardado localmente (sin permisos Firebase)', 'inf');
   } else {
     showToast('✅ Día guardado (solo local)');
   }
-  renderResumen();
 }
 
 // ── RESUMEN MENSUAL ─────────────────────────────────────────────
@@ -774,7 +777,10 @@ function renderResumen() {
       return `<tr>
         <td style="color:var(--text);font-weight:500">${e.nombre}</td>
         <td style="max-width:400px;white-space:normal">${items}${nota}</td>
-        <td><button class="del-btn" onclick="editarDia('${d.fecha}')" title="Editar">✏️</button></td>
+        <td style="white-space:nowrap">
+          <button class="del-btn" onclick="editarDia('${d.fecha}')" title="Editar">✏️</button>
+          <button class="del-btn" onclick="eliminarDiaCP('${d.fecha}')" title="Borrar" style="color:var(--danger);margin-left:4px">🗑</button>
+        </td>
       </tr>`;
     }).join('');
     if (!filas) return '';
@@ -829,6 +835,21 @@ function renderResumen() {
 }
 
 // ── EDITAR DÍA ──────────────────────────────────────────────────
+function eliminarDiaCP(fecha) {
+  if (!confirm('¿Mover el registro del ' + fecha + ' a la papelera? Se podrá recuperar durante 30 días.')) return;
+  (async () => {
+    if (_fbAuth?.currentUser && _teamId && _registroDocs[fecha]) {
+      await fbSoftDelete(fecha);
+      showToast('🗑 Movido a papelera');
+    } else {
+      const data = getData().filter(d => d.fecha !== fecha);
+      saveData(data);
+      showToast('🗑 Registro eliminado');
+      renderResumen();
+    }
+  })();
+}
+
 function editarDia(fecha) {
   document.getElementById('inp-fecha').value = fecha;
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -1194,7 +1215,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ════════════════════════════════════════════════════════════
-// FIREBASE v3.1 — Equipos compartidos, roles, audit, papelera
+// FIREBASE v3.2 — Equipos compartidos, roles, audit, papelera
 // ════════════════════════════════════════════════════════════
 const FB_CONFIG_KEY  = 'firebaseConfig';
 const APP_TYPE       = 'controlpersonal';
@@ -1718,6 +1739,9 @@ function updateFirebaseUI() {
   if (trashCard) trashCard.style.display = isSignedIn ? '' : 'none';
   if (auditCard) auditCard.style.display = isSignedIn ? '' : 'none';
   if (notesCard) notesCard.style.display = (isSignedIn && _myRole === 'admin') ? '' : 'none';
+  // Botón de notas rápidas en nav
+  const btnNotas = document.getElementById('btn-notas-admin');
+  if (btnNotas) btnNotas.style.display = (isSignedIn && _myRole === 'admin') ? '' : 'none';
 }
 
 function renderTeamMembers() {
@@ -1903,6 +1927,63 @@ function applyTheme(mode) {
   }
 }
 
+function toggleNotasAdmin() {
+  const panel = document.getElementById('notas-admin-panel');
+  const overlay = document.getElementById('notas-admin-overlay');
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  overlay.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) renderAdminNotesPanel();
+}
+
+function renderAdminNotesPanel() {
+  const wrap = document.getElementById('admin-notes-panel-list');
+  if (!wrap) return;
+  if (_myRole !== 'admin') { wrap.innerHTML = '<div style="color:var(--text3)">Sin acceso</div>'; return; }
+  const empleados = getEmpleados();
+  wrap.innerHTML = empleados.map(emp => {
+    const empKey = emp.replace(/\s/g, '_');
+    const notes = _adminNotes[emp] || [];
+    const notesHtml = notes.length === 0
+      ? '<div style="color:var(--text3);font-size:12px;font-style:italic;padding:6px 0">Sin notas</div>'
+      : notes.map((n, i) => {
+          const date = new Date(n.timestamp).toLocaleString('es');
+          return '<div style="background:var(--surface2);border-radius:6px;padding:8px 10px;margin-bottom:6px;font-size:12px;line-height:1.5;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">' +
+            '<div style="flex:1;color:var(--text);white-space:pre-wrap">' + n.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>' +
+            '<button onclick="fbDeleteAdminNote(\'' + emp + '\',' + i + ');renderAdminNotesPanel()" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:0;flex-shrink:0">✕</button>' +
+            '</div>' +
+            '<div style="color:var(--text3);font-size:10px;margin-top:3px;font-family:monospace">' + date + '</div>' +
+          '</div>';
+        }).join('');
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;">' +
+      '<div style="font-weight:700;color:var(--text);margin-bottom:8px;font-size:.85rem">' + emp + '</div>' +
+      '<textarea id="panelnote-' + empKey + '" placeholder="Añadir nota sobre ' + emp + '..." style="width:100%;min-height:55px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:6px 8px;font-size:12px;resize:vertical;box-sizing:border-box;font-family:inherit"></textarea>' +
+      '<button onclick="addNoteFromPanel(\'' + emp + '\')" style="margin-top:5px;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600">📝 Añadir</button>' +
+      (notes.length > 0 ? '<div style="margin-top:8px">' + notesHtml + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+async function addNoteFromPanel(emp) {
+  const empKey = emp.replace(/\s/g, '_');
+  const ta = document.getElementById('panelnote-' + empKey);
+  if (!ta || !ta.value.trim()) return;
+  const text = ta.value.trim();
+  const newEntry = { text, timestamp: new Date().toISOString(), by: _currentUser?.email || 'admin' };
+  const empNotes = _adminNotes[emp] || [];
+  empNotes.unshift(newEntry);
+  try {
+    await _fbDb.collection('teams').doc(_teamId).collection('adminPrivate').doc('notes').set({
+      notes: { ..._adminNotes, [emp]: empNotes },
+      modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    ta.value = '';
+    showToast('✅ Nota añadida');
+    renderAdminNotesPanel();
+  } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
 function showHelp() {
   document.getElementById('help-modal').style.display = 'flex';
 }
@@ -1915,6 +1996,19 @@ function closeHelp() {
 Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) });
 
 </script>
+
+<!-- PANEL NOTAS ADMIN -->
+<div id="notas-admin-panel" style="display:none;position:fixed;top:0;right:0;width:min(420px,100vw);height:100vh;background:var(--bg);border-left:1px solid var(--border);z-index:5000;overflow-y:auto;box-shadow:-8px 0 40px rgba(0,0,0,.4);">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;">
+    <span style="font-weight:700;color:#f59e0b;font-size:.95rem;">📓 Notas privadas del admin</span>
+    <button onclick="toggleNotasAdmin()" style="background:none;border:none;color:var(--text3);font-size:1.4rem;cursor:pointer;line-height:1">✕</button>
+  </div>
+  <div style="padding:1rem">
+    <p style="font-size:.78rem;color:var(--text3);margin-bottom:1rem;line-height:1.5;">Solo tú las ves. Los demás miembros no saben que existen.</p>
+    <div id="admin-notes-panel-list"></div>
+  </div>
+</div>
+<div id="notas-admin-overlay" onclick="toggleNotasAdmin()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:4999;"></div>
 
 <!-- MODAL DE AYUDA -->
 <div id="help-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9998;align-items:center;justify-content:center;padding:1rem">
