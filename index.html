@@ -365,8 +365,8 @@
       <div class="card-title"><span>🔥</span> Sincronización Firebase</div>
       <p class="sync-info">Datos sincronizados <strong style="color:var(--accent3)">en tiempo real</strong> entre todos tus dispositivos. Inicias sesión <strong>una sola vez</strong> con Google y queda guardado permanentemente.</p>
 
-      <!-- Estado: SIN configurar -->
-      <div id="fb-state-setup">
+      <!-- Estado: SIN configurar (oculto — config hardcodeada en el código) -->
+      <div id="fb-state-setup" style="display:none!important">
         <p class="sync-info" style="margin-top:14px">
           <strong style="color:var(--accent3)">Configuración inicial (una sola vez):</strong><br>
           1. Ve a <strong>console.firebase.google.com</strong> y crea un proyecto<br>
@@ -1230,7 +1230,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ════════════════════════════════════════════════════════════
-// FIREBASE v3.3 — Equipos compartidos, roles, audit, papelera
+// FIREBASE v3.4 — Equipos compartidos, roles, audit, papelera
 // ════════════════════════════════════════════════════════════
 const FB_CONFIG_KEY  = 'firebaseConfig';
 const APP_TYPE       = 'controlpersonal';
@@ -1751,7 +1751,7 @@ function updateFirebaseUI() {
   const notesCard = document.getElementById('admin-notes-card');
   if (!setup) return;
   const isSignedIn = !!_fbAuth?.currentUser;
-  if (!_fbInitialized) { setup.style.display = ''; signin.style.display = 'none'; active.style.display = 'none'; }
+  if (!_fbInitialized) { setup.style.display = 'none'; signin.style.display = 'block'; active.style.display = 'none'; }
   else if (!isSignedIn) { setup.style.display = 'none'; signin.style.display = ''; active.style.display = 'none'; }
   else {
     setup.style.display = 'none'; signin.style.display = 'none'; active.style.display = '';
@@ -1925,9 +1925,21 @@ function applyRoleRestrictions() {
   } else if (!isViewer && banner) banner.remove();
 }
 
+// Config Firebase hardcodeada — los usuarios no necesitan configurar nada
+const FIREBASE_CONFIG_HARDCODED = {
+  apiKey: "AIzaSyBRNabjKQ5RikSyhppzPHXo4rAeQk6Y8Sk",
+  authDomain: "fibracontrol-16a50.firebaseapp.com",
+  projectId: "fibracontrol-16a50",
+  storageBucket: "fibracontrol-16a50.firebasestorage.app",
+  messagingSenderId: "541136457242",
+  appId: "1:541136457242:web:57cc57af8c931397d4cba3",
+  measurementId: "G-GYV6RGSTSJ"
+};
+
 async function firebaseAutoInit() {
-  const cfg = await loadFbConfig();
-  if (cfg) { try { await initFirebase(cfg); } catch(e) { console.error(e); } }
+  try {
+    await initFirebase(FIREBASE_CONFIG_HARDCODED);
+  } catch(e) { console.error('Firebase init error:', e); }
   updateFirebaseUI();
 }
 
