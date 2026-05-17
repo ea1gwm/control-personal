@@ -398,7 +398,10 @@
           </div>
         </div>
         <div style="font-size:.78rem;color:var(--text-dim);margin-bottom:12px;font-family:monospace" id="fb-last-sync"></div>
-        <button class="cloud-sync-btn secondary" onclick="firebaseSignOut()" style="color:var(--danger)">✕ CERRAR SESIÓN</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="cloud-sync-btn" onclick="forzarSincronizacion()">☁ FORZAR SINCRONIZACIÓN</button>
+          <button class="cloud-sync-btn secondary" onclick="firebaseSignOut()" style="color:var(--danger)">✕ CERRAR SESIÓN</button>
+        </div>
       </div>
     </div>
 
@@ -679,10 +682,12 @@ async function guardarDia() {
   // Sincronizar con Firestore en segundo plano
   if (_fbAuth?.currentUser && _teamId) {
     const ok = await fbSaveRegistro(entry);
-    if (ok) showToast('✅ Día guardado y sincronizado');
-    else showToast('✅ Guardado localmente (sin permisos Firebase)', 'inf');
+    if (ok) showToast('✅ Día guardado y sincronizado en Firebase');
+    else showToast('⚠️ Guardado local — sin permisos en Firebase', 'warn');
+  } else if (!_fbAuth?.currentUser) {
+    showToast('✅ Guardado local — inicia sesión para sincronizar', 'warn');
   } else {
-    showToast('✅ Día guardado (solo local)');
+    showToast('✅ Guardado local — esperando equipo (intenta forzar sincronización)', 'warn');
   }
 }
 
@@ -1242,7 +1247,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ════════════════════════════════════════════════════════════
-// FIREBASE v3.4 — Equipos compartidos, roles, audit, papelera
+// FIREBASE v3.5 — Equipos compartidos, roles, audit, papelera
 // ════════════════════════════════════════════════════════════
 const FB_CONFIG_KEY  = 'firebaseConfig';
 const APP_TYPE       = 'controlpersonal';
@@ -2034,6 +2039,19 @@ async function addNoteFromPanel(emp) {
       modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   } catch(e) { showToast('⚠️ Error guardando: ' + e.message, 'warn'); }
+}
+
+async function forzarSincronizacion() {
+  if (!_fbAuth?.currentUser) { showToast('⚠️ Debes iniciar sesión primero', 'warn'); return; }
+  if (!_teamId) { showToast('⚠️ Esperando equipo (intenta de nuevo en unos segundos)', 'warn'); return; }
+  const data = getData();
+  if (data.length === 0) { showToast('No hay datos locales que sincronizar', 'warn'); return; }
+  showToast('☁️ Subiendo ' + data.length + ' registros…');
+  try {
+    await pushAllDataToFirestore(data);
+    await fbSaveSettings();
+    showToast('✅ Sincronización completada (' + data.length + ' registros)');
+  } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
 }
 
 function showHelp() {
