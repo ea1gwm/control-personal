@@ -327,17 +327,28 @@
       <div class="card-title"><span>👥</span> Miembros del equipo</div>
       <div id="team-info"></div>
       <div id="team-members-list" style="margin-bottom:12px"></div>
-      <div id="invite-box" style="display:none;border-top:1px solid var(--border);padding-top:12px">
-        <label style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block">Invitar nuevo miembro</label>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <input type="email" id="inv-email" placeholder="correo@gmail.com" style="flex:1;min-width:180px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px">
-          <select id="inv-role" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px">
+      <!-- ADMIN: Generar código de acceso -->
+      <div id="invite-box" style="display:none;border-top:1px solid var(--border);padding-top:14px;margin-top:6px">
+        <label style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:block">🔑 Generar código de acceso</label>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5">Genera un código y dáselo a la persona. Tiene 7 días de validez y un solo uso. Cuando termine, elimínalo.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+          <select id="code-role" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;flex:1">
             <option value="viewer">👁 Solo ver</option>
-            <option value="editor-own">✏ Solo propios</option>
-            <option value="editor">✏ Editor</option>
-            <option value="admin">👑 Admin</option>
+            <option value="editor-own">✏ Editor solo nuevos</option>
+            <option value="editor">✏ Editor completo</option>
           </select>
-          <button class="cloud-sync-btn" style="padding:8px 14px;font-size:11px" onclick="fbInviteMember()">✉ INVITAR</button>
+          <button class="cloud-sync-btn" onclick="generarCodigo()" style="padding:8px 16px">🔑 GENERAR CÓDIGO</button>
+        </div>
+        <div id="codigos-activos" style="margin-top:4px"></div>
+      </div>
+
+      <!-- USUARIO: Introducir código -->
+      <div id="usar-codigo-box" style="border-top:1px solid var(--border);padding-top:14px;margin-top:12px">
+        <label style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:block">¿Tienes un código de acceso?</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="inp-codigo" placeholder="Ej: ABC123" maxlength="6"
+            style="flex:1;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:14px;text-transform:uppercase;font-family:monospace;letter-spacing:3px">
+          <button class="cloud-sync-btn" onclick="usarCodigo()">✅ UNIRME</button>
         </div>
       </div>
     </div>
@@ -472,7 +483,7 @@ const MOTIVOS = [
   { key: 'falta', label: 'Falta', badge: 'badge-baja', hasAmount: false, hasText: true },
 ];
 
-const DEFAULT_EMPLEADOS = ['Yago', 'Juan', 'Jorge', 'Marcos', 'Braulio'];
+const DEFAULT_EMPLEADOS = [];  // Sin empleados por defecto — se añaden desde la app
 
 // ── INIT ────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -933,6 +944,7 @@ function guardarEmpleados() {
   const empleados = Array.from(inputs).map(i => i.value.trim()).filter(Boolean);
   saveEmpleados(empleados);
   renderEmpleadosGrid();
+  if (_fbAuth?.currentUser && _teamId) fbSaveSettings();
   showToast('✅ Empleados guardados');
 }
 
@@ -1251,7 +1263,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ════════════════════════════════════════════════════════════
-// FIREBASE v3.8 — Equipos compartidos, roles, audit, papelera
+// FIREBASE v3.9 — Equipos compartidos, roles, audit, papelera
 // ════════════════════════════════════════════════════════════
 const FB_CONFIG_KEY  = 'firebaseConfig';
 const APP_TYPE       = 'controlpersonal';
@@ -1698,32 +1710,110 @@ async function logAudit(action, details = {}) {
 // ═══════════════════════════════════════════════
 // GESTIÓN DE MIEMBROS
 // ═══════════════════════════════════════════════
+// ── SISTEMA DE CÓDIGOS DE ACCESO ─────────────────────────────
 function emailKey(email) { return email.replace(/\./g, ',').toLowerCase(); }
 
-async function fbInviteMember() {
-  if (_myRole !== 'admin') { showToast('⚠️ Solo el admin puede invitar', 'warn'); return; }
-  const email = document.getElementById('inv-email').value.trim().toLowerCase();
-  const role  = document.getElementById('inv-role').value;
-  if (!email || !email.includes('@')) { showToast('⚠️ Email inválido', 'warn'); return; }
+const ROLE_LABELS = { admin: '👑 Admin', editor: '✏ Editor', 'editor-own': '✏ Solo nuevos', viewer: '👁 Solo ver' };
+
+async function generarCodigo() {
+  if (_myRole !== 'admin') { showToast('⚠️ Solo el admin puede generar códigos', 'warn'); return; }
+  const role = document.getElementById('code-role').value;
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   try {
-    await _fbDb.collection('teams').doc(_teamId).update({
-      invitedEmails: firebase.firestore.FieldValue.arrayUnion(email),
-      [`emailRoles.${emailKey(email)}`]: role
+    await _fbDb.collection('inviteCodes').doc(code).set({
+      teamId: _teamId,
+      teamName: _teamData?.name || 'Mi equipo',
+      appType: APP_TYPE,
+      role,
+      createdBy: _currentUser.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      expiresAt: firebase.firestore.Timestamp.fromDate(expires),
+      used: false
     });
-    await logAudit('member_invite', { targetEmail: email, role });
-    document.getElementById('inv-email').value = '';
-    showToast('✉️ Invitación enviada a ' + email);
+    await logAudit('invite_code_created', { code, role });
+    await cargarCodigosActivos();
+    showToast('✅ Código generado: ' + code);
   } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
 }
 
-async function fbCancelInvite(email) {
+async function eliminarCodigo(code) {
+  if (!confirm('¿Eliminar el código ' + code + '?')) return;
   try {
-    await _fbDb.collection('teams').doc(_teamId).update({
-      invitedEmails: firebase.firestore.FieldValue.arrayRemove(email),
-      [`emailRoles.${emailKey(email)}`]: firebase.firestore.FieldValue.delete()
-    });
-    showToast('✅ Invitación cancelada');
+    await _fbDb.collection('inviteCodes').doc(code).delete();
+    await cargarCodigosActivos();
+    showToast('✅ Código eliminado');
   } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
+async function cargarCodigosActivos() {
+  if (_myRole !== 'admin' || !_teamId) return;
+  const wrap = document.getElementById('codigos-activos');
+  if (!wrap) return;
+  try {
+    const snap = await _fbDb.collection('inviteCodes')
+      .where('teamId', '==', _teamId)
+      .where('used', '==', false)
+      .get();
+    if (snap.empty) { wrap.innerHTML = '<div style="font-size:12px;color:var(--text3)">No hay códigos activos.</div>'; return; }
+    wrap.innerHTML = '<div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-weight:600">CÓDIGOS ACTIVOS:</div>' +
+      snap.docs.map(d => {
+        const dt = d.data();
+        const exp = dt.expiresAt?.toDate ? dt.expiresAt.toDate().toLocaleDateString('es') : '?';
+        const roleLbl = ROLE_LABELS[dt.role] || dt.role;
+        return '<div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border-radius:6px;padding:8px 12px;margin-bottom:6px;">' +
+          '<span style="font-family:monospace;font-size:1.1rem;font-weight:700;color:var(--accent3);letter-spacing:3px">' + d.id + '</span>' +
+          '<span style="font-size:11px;color:var(--text3);flex:1">' + roleLbl + ' · caduca ' + exp + '</span>' +
+          '<button onclick="eliminarCodigo(&quot;' + d.id + '&quot;)" style="background:rgba(239,68,68,.12);color:var(--danger);border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer">✕ Eliminar</button>' +
+        '</div>';
+      }).join('');
+  } catch(e) { console.warn('cargarCodigos:', e); }
+}
+
+async function usarCodigo() {
+  const code = (document.getElementById('inp-codigo').value || '').trim().toUpperCase();
+  if (!code || code.length !== 6) { showToast('⚠️ Introduce un código de 6 caracteres', 'warn'); return; }
+  if (!_fbAuth?.currentUser) { showToast('⚠️ Debes iniciar sesión primero', 'warn'); return; }
+  try {
+    const doc = await _fbDb.collection('inviteCodes').doc(code).get();
+    if (!doc.exists) { showToast('⚠️ Código inválido o ya usado', 'warn'); return; }
+    const dt = doc.data();
+    if (dt.used) { showToast('⚠️ Este código ya fue utilizado', 'warn'); return; }
+    if (dt.appType !== APP_TYPE) { showToast('⚠️ Código de otra aplicación', 'warn'); return; }
+    if (dt.expiresAt?.toDate && dt.expiresAt.toDate() < new Date()) { showToast('⚠️ El código ha caducado', 'warn'); return; }
+    if (dt.teamId === _currentUser.uid) { showToast('⚠️ No puedes unirte a tu propio equipo', 'warn'); return; }
+
+    // Unirse al equipo
+    await _fbDb.collection('teams').doc(dt.teamId).update({
+      [`members.${_currentUser.uid}`]: {
+        email: _currentUser.email,
+        role: dt.role,
+        joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+      },
+      memberUids: firebase.firestore.FieldValue.arrayUnion(_currentUser.uid)
+    });
+
+    // Marcar código como usado
+    await doc.ref.update({ used: true, usedBy: _currentUser.uid, usedAt: firebase.firestore.FieldValue.serverTimestamp() });
+
+    // Cambiar al nuevo equipo
+    localStorage.setItem('lastTeamId', dt.teamId);
+    document.getElementById('inp-codigo').value = '';
+    const roleLbl = ROLE_LABELS[dt.role] || dt.role;
+    showToast('✅ Acceso concedido (' + roleLbl + '). Cargando datos del equipo…');
+    await fbInitForUser(_currentUser);
+  } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
+// Cuando admin abre la sección de equipo, cargar códigos activos
+async function fbInviteMember() {
+  cargarCodigosActivos(); // compatibilidad — ahora usa códigos
+}
+
+async function fbCancelInvite(email) {
+  // Ya no se usa, pero se mantiene por compatibilidad
 }
 
 async function fbChangeRole(uid, newRole) {
@@ -1803,6 +1893,8 @@ function updateFirebaseUI() {
     if (roleEl) roleEl.textContent = roleLabel;
   }
   if (teamMgmt)  teamMgmt.style.display  = isSignedIn ? '' : 'none';
+  const codigoBox = document.getElementById('usar-codigo-box');
+  if (codigoBox) codigoBox.style.display = isSignedIn ? '' : 'none';
   if (trashCard) trashCard.style.display = isSignedIn ? '' : 'none';
   if (auditCard) auditCard.style.display = isSignedIn ? '' : 'none';
   if (notesCard) notesCard.style.display = (isSignedIn && _myRole === 'admin') ? '' : 'none';
@@ -1867,7 +1959,10 @@ function renderTeamMembers() {
 
   // Mostrar/ocultar zona de invitación
   const inviteBox = document.getElementById('invite-box');
-  if (inviteBox) inviteBox.style.display = isAdmin ? 'block' : 'none';
+  if (inviteBox) {
+    inviteBox.style.display = isAdmin ? 'block' : 'none';
+    if (isAdmin) cargarCodigosActivos();
+  }
 
   // Selector de equipo si hay más de uno
   renderTeamSelector();
@@ -2209,7 +2304,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v3.8
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v3.9
   </span>
 </footer>
 </body>
