@@ -325,6 +325,7 @@
     <!-- GESTIÓN DEL EQUIPO -->
     <div class="card" id="team-mgmt-card" style="display:none">
       <div class="card-title"><span>👥</span> Miembros del equipo</div>
+      <div id="team-info"></div>
       <div id="team-members-list" style="margin-bottom:12px"></div>
       <div id="invite-box" style="display:none;border-top:1px solid var(--border);padding-top:12px">
         <label style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;display:block">Invitar nuevo miembro</label>
@@ -1250,7 +1251,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ════════════════════════════════════════════════════════════
-// FIREBASE v3.7 — Equipos compartidos, roles, audit, papelera
+// FIREBASE v3.8 — Equipos compartidos, roles, audit, papelera
 // ════════════════════════════════════════════════════════════
 const FB_CONFIG_KEY  = 'firebaseConfig';
 const APP_TYPE       = 'controlpersonal';
@@ -1364,7 +1365,13 @@ async function fbInitForUser(user) {
     const allTeams = await findMyTeams();
     _myTeams = allTeams;
     const last = localStorage.getItem('lastTeamId');
-    _teamId = (last && allTeams.find(t => t.id === last && t.isMember)) ? last : user.uid;
+    if (last && allTeams.find(t => t.id === last && t.isMember)) {
+      _teamId = last;
+    } else {
+      // Si el usuario fue invitado a otro equipo, usarlo por defecto
+      const otherTeam = allTeams.find(t => t.id !== user.uid && t.isMember);
+      _teamId = otherTeam ? otherTeam.id : user.uid;
+    }
     await tryMigrateV2(user);
     subscribeToTeam(_teamId);
   } catch(e) {
@@ -1759,7 +1766,9 @@ async function acceptInvitation(teamId) {
       [`emailRoles.${emailKey(email)}`]: firebase.firestore.FieldValue.delete()
     });
     await logAudit('member_join', {});
-    showToast('✅ Te has unido al equipo');
+    // Cambiar automáticamente al equipo que se acaba de aceptar
+    localStorage.setItem('lastTeamId', teamId);
+    showToast('✅ Te has unido al equipo. Cambiando a sus datos…');
     await fbInitForUser(_currentUser);
   } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
 }
@@ -1809,6 +1818,16 @@ function renderTeamMembers() {
   const members = Object.entries(_teamData.members || {});
   const invited = _teamData.invitedEmails || [];
   const emailRoles = _teamData.emailRoles || {};
+
+  // Info del equipo actual
+  const teamInfo = document.getElementById('team-info');
+  if (teamInfo) {
+    const isOwnTeam = _teamId === _currentUser.uid;
+    teamInfo.innerHTML = isOwnTeam
+      ? '<div style="font-size:.78rem;color:var(--text3);margin-bottom:10px">Este es tu equipo propio.</div>'
+      : '<div style="font-size:.78rem;color:var(--accent3);margin-bottom:10px;font-weight:600">👥 Estás viendo el equipo de ' + (_teamData.ownerEmail || 'otro usuario') + '</div>';
+  }
+
   let html = '';
   members.forEach(([uid, m]) => {
     const isOwner = uid === _teamData.ownerUid;
@@ -1945,16 +1964,39 @@ function renderAuditLog() {
 // RESTRICCIONES DE ROL EN UI
 // ═══════════════════════════════════════════════
 function applyRoleRestrictions() {
+  const canEdit = _myRole === 'admin' || _myRole === 'editor' || _myRole === 'editor-own';
   const isViewer = _myRole === 'viewer';
+
+  // Pestaña de Registro: ocultar si solo puede ver
+  const tabRegistro = document.querySelector('button[onclick*="registro"]');
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  tabBtns.forEach(btn => {
+    if (btn.textContent.includes('Registro')) {
+      btn.style.display = canEdit ? '' : 'none';
+    }
+  });
+
+  // Botón guardar del formulario
+  const btnGuardar = document.querySelector('button[onclick="guardarDia()"]');
+  if (btnGuardar) btnGuardar.style.display = canEdit ? '' : 'none';
+
+  // Banner de solo lectura en el área de datos
   let banner = document.getElementById('readonly-banner');
-  if (isViewer && !banner) {
-    banner = document.createElement('div');
-    banner.id = 'readonly-banner';
-    banner.style.cssText = 'background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:10px 14px;margin:0 0 12px;font-size:13px;color:var(--accent);text-align:center;';
-    banner.innerHTML = '👁 Estás en modo <strong>solo lectura</strong> en este equipo';
-    const tab = document.querySelector('.tab.active');
-    if (tab) tab.insertBefore(banner, tab.firstChild);
-  } else if (!isViewer && banner) banner.remove();
+  if (isViewer) {
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'readonly-banner';
+      banner.style.cssText = 'background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:10px 14px;margin:0 0 12px;font-size:13px;color:var(--accent3);text-align:center;position:sticky;top:0;z-index:100;';
+      banner.innerHTML = '👁 <strong>Modo solo lectura</strong> — solo puedes consultar datos de este equipo';
+      const mainContent = document.querySelector('.main-content') || document.querySelector('.app') || document.body;
+      mainContent.insertBefore(banner, mainContent.firstChild);
+    }
+    // Ir directamente al resumen si estaban en registro
+    if (!document.getElementById('tab-resumen').classList.contains('hidden')) return;
+    switchTab('resumen');
+  } else {
+    if (banner) banner.remove();
+  }
 }
 
 // Config Firebase hardcodeada — los usuarios no necesitan configurar nada
@@ -2167,7 +2209,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v3.7
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v3.8
   </span>
 </footer>
 </body>
