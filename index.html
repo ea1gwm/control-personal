@@ -688,13 +688,25 @@ async function guardarDia() {
 
 // ── RESUMEN MENSUAL ─────────────────────────────────────────────
 function renderResumen() {
-  const mes = parseInt(document.getElementById('filter-mes').value);
-  const anio = parseInt(document.getElementById('filter-anio').value);
-  const data = getData().filter(d => {
-    const dt = new Date(d.fecha + 'T00:00:00');
-    return dt.getMonth() === mes && dt.getFullYear() === anio;
-  });
   const wrap = document.getElementById('resumen-content');
+  if (!wrap) return;
+  const mes  = parseInt(document.getElementById('filter-mes').value);
+  const anio = parseInt(document.getElementById('filter-anio').value);
+
+  // Filtrar datos del mes/año, parseando fechas de forma robusta
+  const data = getData().filter(d => {
+    if (!d.fecha) return false;
+    const fechaStr = String(d.fecha).slice(0, 10);
+    const parts = fechaStr.split('-');
+    if (parts.length !== 3) return false;
+    const y = parseInt(parts[0]);
+    const m = parseInt(parts[1]) - 1;  // JS months 0-11
+    return m === mes && y === anio;
+  });
+
+  // Limpiar siempre para forzar feedback visual al cambiar de mes
+  wrap.innerHTML = '';
+
   if (!data.length) {
     wrap.innerHTML = '<div class="card"><div style="text-align:center;padding:40px;color:var(--text3);font-size:13px"><div style="font-size:32px;margin-bottom:8px">📊</div>Sin datos para este mes.</div></div>';
     return;
@@ -2090,7 +2102,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v3.3
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v3.4
   </span>
 </footer>
 </body>
