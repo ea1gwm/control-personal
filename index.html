@@ -399,7 +399,8 @@
         </div>
         <div style="font-size:.78rem;color:var(--text-dim);margin-bottom:12px;font-family:monospace" id="fb-last-sync"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="cloud-sync-btn" onclick="forzarSincronizacion()">☁ FORZAR SINCRONIZACIÓN</button>
+          <button class="cloud-sync-btn" onclick="forzarSincronizacion()">⬆ SUBIR A FIREBASE</button>
+          <button class="cloud-sync-btn" onclick="descargarDesdeFirebase()">⬇ DESCARGAR DE FIREBASE</button>
           <button class="cloud-sync-btn secondary" onclick="firebaseSignOut()" style="color:var(--danger)">✕ CERRAR SESIÓN</button>
         </div>
       </div>
@@ -1247,7 +1248,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ════════════════════════════════════════════════════════════
-// FIREBASE v3.5 — Equipos compartidos, roles, audit, papelera
+// FIREBASE v3.6 — Equipos compartidos, roles, audit, papelera
 // ════════════════════════════════════════════════════════════
 const FB_CONFIG_KEY  = 'firebaseConfig';
 const APP_TYPE       = 'controlpersonal';
@@ -1464,7 +1465,17 @@ function subscribeToTeam(teamId) {
       else { active.push(r); _registroDocs[r.fecha] = d.id; }
     });
     _trashRegistros = trash;
-    saveData(active);
+
+    // Limpiar campos internos antes de guardar localmente
+    const clean = active.map(r => {
+      const { _id, createdBy, createdByEmail, createdAt, modifiedBy, modifiedByEmail,
+              modifiedAt, deleted, deletedBy, deletedByEmail, deletedAt, autoPurgeAt,
+              ...rest } = r;
+      return rest;
+    });
+    clean.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+    saveData(clean);
+
     renderEmpleadosAdmin && renderEmpleadosAdmin();
     renderEmpleadosGrid && renderEmpleadosGrid();
     renderResumen && renderResumen();
@@ -2046,12 +2057,43 @@ async function forzarSincronizacion() {
   if (!_teamId) { showToast('⚠️ Esperando equipo (intenta de nuevo en unos segundos)', 'warn'); return; }
   const data = getData();
   if (data.length === 0) { showToast('No hay datos locales que sincronizar', 'warn'); return; }
-  showToast('☁️ Subiendo ' + data.length + ' registros…');
+  showToast('☁️ Subiendo ' + data.length + ' registros a Firebase…');
   try {
     await pushAllDataToFirestore(data);
     await fbSaveSettings();
-    showToast('✅ Sincronización completada (' + data.length + ' registros)');
+    // Después de subir, descargar para confirmar que todo está bien
+    await descargarDesdeFirebase(true);
+    showToast('✅ Subida y descarga completadas (' + data.length + ' registros)');
   } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
+async function descargarDesdeFirebase(silencioso = false) {
+  if (!_fbAuth?.currentUser) { showToast('⚠️ Debes iniciar sesión primero', 'warn'); return; }
+  if (!_teamId) { showToast('⚠️ Esperando equipo (intenta de nuevo en unos segundos)', 'warn'); return; }
+  if (!silencioso) showToast('☁️ Descargando datos de Firebase…');
+  try {
+    const snap = await _fbDb.collection('teams').doc(_teamId)
+      .collection('registros').where('deleted', '==', false).get();
+
+    // Limpiar campos internos de Firestore
+    const records = snap.docs.map(d => {
+      const r = d.data();
+      // Quitar campos internos, conservar solo los datos de la app
+      const { createdBy, createdByEmail, createdAt, modifiedBy, modifiedByEmail,
+              modifiedAt, deleted, deletedBy, deletedByEmail, deletedAt, autoPurgeAt,
+              ...rest } = r;
+      return rest;
+    });
+
+    // Ordenar por fecha
+    records.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+
+    saveData(records);
+    renderResumen();
+
+    if (!silencioso) showToast('✅ ' + records.length + ' registros descargados de Firebase');
+    updateFirebaseSyncTime();
+  } catch(e) { showToast('⚠️ Error al descargar: ' + e.message, 'warn'); }
 }
 
 function showHelp() {
@@ -2120,7 +2162,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v3.5
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v3.6
   </span>
 </footer>
 </body>
