@@ -729,6 +729,7 @@ function renderResumen() {
   });
 
   data.forEach(d => {
+    if (!d.empleados || !Array.isArray(d.empleados)) return;
     d.empleados.forEach(e => {
       if (!acum[e.nombre]) return;
       const a = acum[e.nombre];
@@ -784,6 +785,7 @@ function renderResumen() {
 
   // Detalle día a día (más reciente arriba)
   const detalleDias = data.slice().sort((a,b) => b.fecha.localeCompare(a.fecha)).map(d => {
+    if (!d.empleados || !Array.isArray(d.empleados)) return '';
     const filas = d.empleados.filter(e => MOTIVOS.some(m => e[m.key]) || e.notas).map(e => {
       const items = MOTIVOS.filter(m => e[m.key]).map(m => {
         let txt = m.label;
@@ -1248,7 +1250,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ════════════════════════════════════════════════════════════
-// FIREBASE v3.6 — Equipos compartidos, roles, audit, papelera
+// FIREBASE v3.7 — Equipos compartidos, roles, audit, papelera
 // ════════════════════════════════════════════════════════════
 const FB_CONFIG_KEY  = 'firebaseConfig';
 const APP_TYPE       = 'controlpersonal';
@@ -1471,8 +1473,10 @@ function subscribeToTeam(teamId) {
       const { _id, createdBy, createdByEmail, createdAt, modifiedBy, modifiedByEmail,
               modifiedAt, deleted, deletedBy, deletedByEmail, deletedAt, autoPurgeAt,
               ...rest } = r;
+      // Asegurar que empleados siempre es un array
+      if (!rest.empleados || !Array.isArray(rest.empleados)) rest.empleados = [];
       return rest;
-    });
+    }).filter(r => r.fecha); // descartar registros sin fecha
     clean.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
     saveData(clean);
 
@@ -2078,12 +2082,13 @@ async function descargarDesdeFirebase(silencioso = false) {
     // Limpiar campos internos de Firestore
     const records = snap.docs.map(d => {
       const r = d.data();
-      // Quitar campos internos, conservar solo los datos de la app
       const { createdBy, createdByEmail, createdAt, modifiedBy, modifiedByEmail,
               modifiedAt, deleted, deletedBy, deletedByEmail, deletedAt, autoPurgeAt,
               ...rest } = r;
+      // Asegurar que empleados siempre es un array válido
+      if (!rest.empleados || !Array.isArray(rest.empleados)) rest.empleados = [];
       return rest;
-    });
+    }).filter(r => r.fecha); // descartar registros corruptos
 
     // Ordenar por fecha
     records.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
@@ -2162,7 +2167,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v3.6
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v3.7
   </span>
 </footer>
 </body>
