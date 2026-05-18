@@ -210,6 +210,10 @@
 
   <!-- TAB REGISTRO DIARIO -->
   <div id="tab-registro" class="tab-content active">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;gap:8px" id="sync-quick-bar">
+      <button onclick="descargarDesdeFirebase()" style="background:rgba(46,160,67,.12);color:var(--accent3);border:1px solid rgba(46,160,67,.2);border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit">⬇ Sync</button>
+      <button onclick="forzarSincronizacion()" style="background:rgba(96,165,250,.1);color:var(--accent);border:1px solid rgba(96,165,250,.2);border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit">⬆ Subir</button>
+    </div>
     <div class="card">
       <div class="card-title"><span>📅</span> Fecha del Registro</div>
       <div class="form-grid">
@@ -401,7 +405,7 @@
       <!-- Estado: configurado, SIN sesión -->
       <div id="fb-state-signin" style="display:none;">
         <p class="sync-info" style="margin-top:14px;margin-bottom:12px">Firebase configurado ✓ — Inicia sesión:</p>
-        <button class="cloud-sync-btn" onclick="firebaseSignIn()">🔑 INICIAR SESIÓN CON GOOGLE</button>
+        <button class="cloud-sync-btn" id="btn-fb-signin" onclick="firebaseSignIn()">🔑 INICIAR SESIÓN CON GOOGLE</button>
         <button class="cloud-sync-btn secondary" style="margin-left:8px" onclick="firebaseResetConfig()">⚙ CAMBIAR CONFIG</button>
       </div>
 
@@ -697,15 +701,36 @@ async function guardarDia() {
   // Renderizar inmediatamente con datos locales
   renderResumen();
 
-  // Sincronizar con Firestore en segundo plano
+  // Sincronizar con Firestore
   if (_fbAuth?.currentUser && _teamId) {
-    const ok = await fbSaveRegistro(entry);
-    if (ok) showToast('✅ Día guardado y sincronizado en Firebase');
-    else showToast('⚠️ Guardado local — sin permisos en Firebase', 'warn');
-  } else if (!_fbAuth?.currentUser) {
-    showToast('✅ Guardado local — inicia sesión para sincronizar', 'warn');
+    try {
+      const ok = await fbSaveRegistro(entry);
+      if (ok) {
+        showToast('✅ Día guardado y sincronizado');
+      } else {
+        showToast('⚠️ Error de permisos — usa Forzar Sync en Datos', 'warn');
+      }
+    } catch(e) {
+      showToast('⚠️ Error Firebase — guardado solo local', 'warn');
+      console.error('guardarDia Firebase:', e);
+    }
   } else {
-    showToast('✅ Guardado local — esperando equipo (intenta forzar sincronización)', 'warn');
+    // Firebase no está listo — guardar local y sincronizar cuando esté disponible
+    showToast('✅ Guardado local — sincronizando…');
+    // Reintentar sync cuando Firebase esté listo
+    const maxWait = 8000;
+    const start = Date.now();
+    const retry = setInterval(async () => {
+      if (_fbAuth?.currentUser && _teamId) {
+        clearInterval(retry);
+        const ok = await fbSaveRegistro(entry);
+        if (ok) showToast('☁️ Sincronizado con Firebase');
+      }
+      if (Date.now() - start > maxWait) {
+        clearInterval(retry);
+        showToast('⚠️ No se pudo sincronizar — usa Forzar Sync en Datos', 'warn');
+      }
+    }, 1000);
   }
 }
 
@@ -1268,7 +1293,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ════════════════════════════════════════════════════════════
-// FIREBASE v4.0 — Equipos compartidos, roles, audit, papelera
+// FIREBASE v4.2 — Equipos compartidos, roles, audit, papelera
 // ════════════════════════════════════════════════════════════
 const FB_CONFIG_KEY  = 'firebaseConfig';
 const APP_TYPE       = 'controlpersonal';
@@ -1343,7 +1368,13 @@ async function handleFbAuthChange(user) {
 }
 
 async function firebaseSignIn() {
-  if (!_fbAuth) { showToast('⚠️ Configura Firebase primero', 'warn'); return; }
+  // Si Firebase no está listo, intentar inicializar primero
+  if (!_fbInitialized) {
+    showToast('⏳ Iniciando Firebase…');
+    await firebaseAutoInit();
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  if (!_fbAuth) { showToast('⚠️ Error cargando Firebase. Comprueba la conexión.', 'warn'); return; }
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
     await _fbAuth.signInWithPopup(provider);
@@ -1533,22 +1564,15 @@ function subscribeToTeam(teamId) {
     if (!doc.exists) return;
     const data = doc.data();
     let changed = false;
-    if (Array.isArray(data.empleados)) { saveEmpleados(data.empleados); changed = true; }
+    if (Array.isArray(data.empleados) && data.empleados.length > 0) { saveEmpleados(data.empleados); changed = true; }
     if (data.config) { saveConfig(data.config); changed = true; }
     if (changed) {
       renderEmpleadosAdmin && renderEmpleadosAdmin();
       renderEmpleadosGrid && renderEmpleadosGrid();
     }
   });
-  // Forzar descarga inmediata de ajustes (sin esperar al listener)
-  _fbDb.collection('teams').doc(teamId).collection('settings').doc('main').get().then(doc => {
-    if (!doc.exists) return;
-    const data = doc.data();
-    if (Array.isArray(data.empleados)) saveEmpleados(data.empleados);
-    if (data.config) saveConfig(data.config);
-    renderEmpleadosAdmin && renderEmpleadosAdmin();
-    renderEmpleadosGrid && renderEmpleadosGrid();
-  }).catch(() => {});
+  // Descarga inmediata de ajustes + registros al entrar en el equipo
+  setTimeout(() => descargarDesdeFirebase(true), 500);
 
   // Notas privadas admin (diario por empleado)
   if (_myRole === 'admin') {
@@ -1918,7 +1942,7 @@ function updateFirebaseUI() {
   const notesCard = document.getElementById('admin-notes-card');
   if (!setup) return;
   const isSignedIn = !!_fbAuth?.currentUser;
-  if (!_fbInitialized) { setup.style.display = 'none'; signin.style.display = 'block'; active.style.display = 'none'; }
+  if (!_fbInitialized) { setup.style.display = 'none'; signin.style.display = ''; active.style.display = 'none'; }
   else if (!isSignedIn) { setup.style.display = 'none'; signin.style.display = ''; active.style.display = 'none'; }
   else {
     setup.style.display = 'none'; signin.style.display = 'none'; active.style.display = '';
@@ -2284,6 +2308,19 @@ async function descargarDesdeFirebase(silencioso = false) {
   if (!_teamId) { showToast('⚠️ Esperando equipo (intenta de nuevo en unos segundos)', 'warn'); return; }
   if (!silencioso) showToast('☁️ Descargando datos de Firebase…');
   try {
+    // 1. Descargar empleados y configuración (settings)
+    const settingsDoc = await _fbDb.collection('teams').doc(_teamId)
+      .collection('settings').doc('main').get();
+    if (settingsDoc.exists) {
+      const s = settingsDoc.data();
+      if (Array.isArray(s.empleados) && s.empleados.length > 0) {
+        saveEmpleados(s.empleados);
+        renderEmpleadosGrid && renderEmpleadosGrid();
+        renderEmpleadosAdmin && renderEmpleadosAdmin();
+      }
+      if (s.config) saveConfig(s.config);
+    }
+    // 2. Descargar registros
     const snap = await _fbDb.collection('teams').doc(_teamId)
       .collection('registros').where('deleted', '==', false).get();
 
@@ -2375,7 +2412,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.0
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.2
   </span>
 </footer>
 </body>
