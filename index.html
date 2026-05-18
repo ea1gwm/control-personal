@@ -187,6 +187,11 @@
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
+  <!-- Banner equipo activo (visible cuando se ve el equipo de otro) -->
+  <div id="team-banner" style="display:none;background:rgba(245,158,11,.1);border-bottom:2px solid rgba(245,158,11,.3);padding:8px 16px;align-items:center;justify-content:space-between;gap:8px;">
+    <span id="team-banner-text" style="font-size:13px;color:var(--accent3);font-weight:700"></span>
+    <span id="team-banner-role" style="font-size:11px;color:var(--text3);font-family:monospace;background:var(--surface2);padding:2px 8px;border-radius:999px;"></span>
+  </div>
 
 <header>
   <h1>⚙️ Control de Personal</h1>
@@ -1263,7 +1268,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ════════════════════════════════════════════════════════════
-// FIREBASE v3.9 — Equipos compartidos, roles, audit, papelera
+// FIREBASE v4.0 — Equipos compartidos, roles, audit, papelera
 // ════════════════════════════════════════════════════════════
 const FB_CONFIG_KEY  = 'firebaseConfig';
 const APP_TYPE       = 'controlpersonal';
@@ -1477,6 +1482,21 @@ function subscribeToTeam(teamId) {
     applyRoleRestrictions();
   });
 
+  // Carga inicial inmediata de registros (sin esperar al listener)
+  _fbDb.collection('teams').doc(teamId).collection('registros').where('deleted', '==', false).get().then(snap => {
+    if (snap.empty) return;
+    const clean = snap.docs.map(d => {
+      const r = d.data();
+      const { _id, createdBy, createdByEmail, createdAt, modifiedBy, modifiedByEmail,
+              modifiedAt, deleted, deletedBy, deletedByEmail, deletedAt, autoPurgeAt, ...rest } = r;
+      if (!rest.empleados || !Array.isArray(rest.empleados)) rest.empleados = [];
+      return rest;
+    }).filter(r => r.fecha);
+    clean.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+    saveData(clean);
+    renderResumen && renderResumen();
+  }).catch(() => {});
+
   _unsubReg = _fbDb.collection('teams').doc(teamId).collection('registros').onSnapshot(snap => {
     const active = [], trash = [];
     _registroDocs = {};
@@ -1501,6 +1521,10 @@ function subscribeToTeam(teamId) {
 
     renderEmpleadosAdmin && renderEmpleadosAdmin();
     renderEmpleadosGrid && renderEmpleadosGrid();
+
+    // Auto-seleccionar mes más reciente con datos si el mes actual está vacío
+    autoSelectMesConDatos(clean);
+
     renderResumen && renderResumen();
     renderTrash();
   });
@@ -1508,11 +1532,23 @@ function subscribeToTeam(teamId) {
   _unsubSettings = _fbDb.collection('teams').doc(teamId).collection('settings').doc('main').onSnapshot(doc => {
     if (!doc.exists) return;
     const data = doc.data();
+    let changed = false;
+    if (Array.isArray(data.empleados)) { saveEmpleados(data.empleados); changed = true; }
+    if (data.config) { saveConfig(data.config); changed = true; }
+    if (changed) {
+      renderEmpleadosAdmin && renderEmpleadosAdmin();
+      renderEmpleadosGrid && renderEmpleadosGrid();
+    }
+  });
+  // Forzar descarga inmediata de ajustes (sin esperar al listener)
+  _fbDb.collection('teams').doc(teamId).collection('settings').doc('main').get().then(doc => {
+    if (!doc.exists) return;
+    const data = doc.data();
     if (Array.isArray(data.empleados)) saveEmpleados(data.empleados);
     if (data.config) saveConfig(data.config);
     renderEmpleadosAdmin && renderEmpleadosAdmin();
     renderEmpleadosGrid && renderEmpleadosGrid();
-  });
+  }).catch(() => {});
 
   // Notas privadas admin (diario por empleado)
   if (_myRole === 'admin') {
@@ -2061,38 +2097,43 @@ function renderAuditLog() {
 function applyRoleRestrictions() {
   const canEdit = _myRole === 'admin' || _myRole === 'editor' || _myRole === 'editor-own';
   const isViewer = _myRole === 'viewer';
+  const isOwnTeam = !_currentUser || _teamId === _currentUser.uid;
+  const ROLE_TEXT = { admin: '👑 Admin', editor: '✏ Editor', 'editor-own': '✏ Editor (solo nuevas entradas)', viewer: '👁 Solo lectura' };
 
-  // Pestaña de Registro: ocultar si solo puede ver
-  const tabRegistro = document.querySelector('button[onclick*="registro"]');
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  tabBtns.forEach(btn => {
+  // Banner de equipo externo (visible para invitados)
+  const teamBanner = document.getElementById('team-banner');
+  if (teamBanner) {
+    if (!isOwnTeam && _teamData && _myRole) {
+      const ownerName = (_teamData.ownerEmail || '').split('@')[0] || 'otro usuario';
+      const bannerText = document.getElementById('team-banner-text');
+      const bannerRole = document.getElementById('team-banner-role');
+      if (bannerText) bannerText.textContent = '👥 Viendo datos del equipo de ' + ownerName;
+      if (bannerRole) bannerRole.textContent = ROLE_TEXT[_myRole] || _myRole;
+      teamBanner.style.display = 'flex';
+    } else {
+      teamBanner.style.display = 'none';
+    }
+  }
+
+  // Pestaña Registro: visible para editores, oculta para solo ver
+  document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.textContent.includes('Registro')) {
       btn.style.display = canEdit ? '' : 'none';
     }
   });
 
-  // Botón guardar del formulario
+  // Botón guardar
   const btnGuardar = document.querySelector('button[onclick="guardarDia()"]');
   if (btnGuardar) btnGuardar.style.display = canEdit ? '' : 'none';
 
-  // Banner de solo lectura en el área de datos
-  let banner = document.getElementById('readonly-banner');
   if (isViewer) {
-    if (!banner) {
-      banner = document.createElement('div');
-      banner.id = 'readonly-banner';
-      banner.style.cssText = 'background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:10px 14px;margin:0 0 12px;font-size:13px;color:var(--accent3);text-align:center;position:sticky;top:0;z-index:100;';
-      banner.innerHTML = '👁 <strong>Modo solo lectura</strong> — solo puedes consultar datos de este equipo';
-      const mainContent = document.querySelector('.main-content') || document.querySelector('.app') || document.body;
-      mainContent.insertBefore(banner, mainContent.firstChild);
-    }
-    // Ir directamente al resumen si estaban en registro
-    if (!document.getElementById('tab-resumen').classList.contains('hidden')) return;
+    // Viewer: ir al resumen con los datos del equipo
     switchTab('resumen');
-  } else {
-    if (banner) banner.remove();
+    renderResumen();
   }
+
 }
+
 
 // Config Firebase hardcodeada — los usuarios no necesitan configurar nada
 const FIREBASE_CONFIG_HARDCODED = {
@@ -2191,6 +2232,36 @@ async function addNoteFromPanel(emp) {
       modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   } catch(e) { showToast('⚠️ Error guardando: ' + e.message, 'warn'); }
+}
+
+function autoSelectMesConDatos(registros) {
+  if (!registros || registros.length === 0) return;
+  const selMes  = document.getElementById('filter-mes');
+  const selAnio = document.getElementById('filter-anio');
+  if (!selMes || !selAnio) return;
+  const mesSel  = parseInt(selMes.value);
+  const anioSel = parseInt(selAnio.value);
+
+  // Comprobar si el mes actual tiene datos
+  const tieneActual = registros.some(d => {
+    if (!d.fecha) return false;
+    const parts = d.fecha.slice(0, 10).split('-');
+    return parseInt(parts[1]) - 1 === mesSel && parseInt(parts[0]) === anioSel;
+  });
+
+  if (!tieneActual) {
+    // Buscar el mes más reciente con datos
+    const fechas = registros
+      .filter(d => d.fecha)
+      .map(d => d.fecha.slice(0, 10))
+      .sort()
+      .reverse();
+    if (fechas.length > 0) {
+      const parts = fechas[0].split('-');
+      selAnio.value = parts[0];
+      selMes.value  = String(parseInt(parts[1]) - 1);
+    }
+  }
 }
 
 async function forzarSincronizacion() {
@@ -2304,7 +2375,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v3.9
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.0
   </span>
 </footer>
 </body>
