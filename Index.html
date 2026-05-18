@@ -1,0 +1,2413 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Personal</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1f2937;
+    --border: #30363d; --accent: #f59e0b; --accent2: #10b981;
+    --accent3: #3b82f6; --danger: #ef4444; --purple: #8b5cf6;
+    --text: #e6edf3; --text2: #8b949e; --text3: #6e7681;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; font-size: 14px; }
+
+  header {
+    background: var(--surface); border-bottom: 2px solid var(--accent);
+    padding: 16px 24px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 100;
+  }
+  header h1 { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; color: var(--accent); }
+  .date-badge { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text2); background: var(--surface2); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); }
+
+  .tabs { display: flex; gap: 4px; padding: 16px 24px 0; border-bottom: 1px solid var(--border); background: var(--surface); flex-wrap: wrap; }
+  .tab-btn { background: none; border: none; color: var(--text2); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; padding: 10px 18px; cursor: pointer; border-radius: 6px 6px 0 0; border-bottom: 2px solid transparent; transition: all 0.2s; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(245,158,11,0.05); }
+
+  .main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  .card-title { font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 1.5px; color: var(--accent); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  label { font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: 0.8px; text-transform: uppercase; }
+  input, select, textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color 0.2s; width: 100%; }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  select option { background: var(--surface2); }
+
+  /* EMPLEADOS GRID */
+  .empleados-grid { display: flex; flex-direction: column; gap: 12px; }
+  .empleado-row {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 18px; transition: border-color 0.2s;
+  }
+  .empleado-row:hover { border-color: var(--accent); }
+  .empleado-row.tiene-datos { border-color: var(--accent2); }
+  .empleado-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; cursor: pointer; }
+  .empleado-nombre { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 1px; color: var(--text); }
+  .empleado-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .emp-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 10px; }
+  .emp-fields.hidden { display: none; }
+
+  .check-group { display: flex; align-items: center; gap: 8px; background: var(--surface2); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s; }
+  .check-group:hover { border-color: var(--accent); }
+  .check-group.activo { border-color: var(--accent2); background: rgba(16,185,129,0.08); }
+  .check-group input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent2); cursor: pointer; }
+  .check-group label { font-size: 12px; color: var(--text); cursor: pointer; text-transform: none; letter-spacing: 0; font-weight: 500; }
+
+  .with-amount { display: flex; gap: 6px; align-items: center; }
+  .with-amount input[type=number] { width: 80px; flex-shrink: 0; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; }
+  .badge-dieta { background: rgba(245,158,11,0.15); color: var(--accent); }
+  .badge-baja { background: rgba(239,68,68,0.15); color: var(--danger); }
+  .badge-vac { background: rgba(59,130,246,0.15); color: var(--accent3); }
+  .badge-extra { background: rgba(139,92,246,0.15); color: var(--purple); }
+  .badge-ok { background: rgba(16,185,129,0.15); color: var(--accent2); }
+  .badge-cedido { background: rgba(245,158,11,0.1); color: var(--accent); }
+
+  .save-btn { background: var(--accent); color: #000; border: none; padding: 12px 28px; border-radius: 8px; font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 1.5px; cursor: pointer; transition: all 0.2s; margin-top: 8px; }
+  .save-btn:hover { background: #fbbf24; transform: translateY(-1px); }
+
+  /* RESUMEN */
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .sum-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+  .sum-val { font-family: 'Bebas Neue', sans-serif; font-size: 32px; line-height: 1; color: var(--accent); }
+  .sum-label { font-size: 11px; color: var(--text2); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.8px; }
+  .sum-sub { font-size: 11px; color: var(--text3); margin-top: 4px; font-family: 'DM Mono', monospace; }
+
+  .log-table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'DM Mono', monospace; }
+  th { background: var(--surface2); color: var(--text2); font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text); white-space: nowrap; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* DATA BUTTONS */
+  .data-btn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .data-btn { display: flex; flex-direction: column; align-items: flex-start; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; cursor: pointer; text-align: left; transition: all 0.2s; font-family: 'DM Sans', sans-serif; }
+  .data-btn:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .data-btn .db-icon { font-size: 24px; margin-bottom: 10px; }
+  .data-btn .db-title { font-family: 'Bebas Neue', sans-serif; font-size: 15px; letter-spacing: 1.5px; color: var(--accent); margin-bottom: 4px; }
+  .data-btn .db-desc { font-size: 11px; color: var(--text3); line-height: 1.5; }
+  .data-btn.green:hover { border-color: var(--accent2); }
+  .data-btn.green .db-title { color: var(--accent2); }
+  .data-btn.blue:hover { border-color: var(--accent3); }
+  .data-btn.blue .db-title { color: var(--accent3); }
+  .data-btn.danger:hover { border-color: var(--danger); }
+  .data-btn.danger .db-title { color: var(--danger); }
+
+  .inp-cloud { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .inp-cloud input { flex: 1; }
+  .cloud-sync-btn { background: var(--accent3); color: #fff; border: none; padding: 9px 16px; border-radius: 6px; font-family: 'Bebas Neue', sans-serif; font-size: 14px; letter-spacing: 1px; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+  .cloud-sync-btn:hover { background: #60a5fa; }
+  .cloud-sync-btn.secondary { background: var(--surface2); color: var(--text2); }
+  .cloud-sync-btn.secondary:hover { background: var(--border); color: var(--text); }
+  .cloud-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); margin-top: 12px; font-family: 'DM Mono', monospace; }
+  .cloud-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent2); }
+  .cloud-dot.off { background: var(--text3); }
+  .sync-info { font-size: 11px; color: var(--text3); margin-top: 6px; line-height: 1.6; }
+
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--accent2); color: #000; padding: 12px 20px; border-radius: 8px; font-weight: 600; font-size: 13px; z-index: 999; opacity: 0; transform: translateY(10px); transition: all 0.3s; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  .del-btn { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 12px; padding: 4px 8px; border-radius: 4px; transition: all 0.2s; }
+  .del-btn:hover { color: var(--danger); }
+
+  .empleados-admin { display: flex; flex-direction: column; gap: 8px; }
+  .emp-admin-row { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; }
+  .emp-admin-row input { flex: 1; }
+  .remove-emp-btn { background: none; border: 1px solid var(--border); color: var(--text3); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
+  .remove-emp-btn:hover { border-color: var(--danger); color: var(--danger); }
+  .add-emp-btn { background: none; border: 1px dashed var(--border); color: var(--text2); padding: 10px; border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; width: 100%; transition: all 0.2s; margin-top: 8px; }
+  .add-emp-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .filter-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 16px; }
+  .filter-row .form-group { min-width: 140px; }
+
+  @media (max-width: 600px) {
+    .emp-fields { grid-template-columns: 1fr 1fr; }
+    header h1 { font-size: 20px; }
+  }
+    /* ── TEMA CLARO ─────────────────────────────────────── */
+    body.theme-light {
+      --bg:        #f1f5f9;
+      --surface:   #ffffff;
+      --surface2:  #f8fafc;
+      --border:    #cbd5e1;
+      --text:      #1e293b;
+      --text2:     #334155;
+      --text3:     #64748b;
+    }
+    body.theme-light input, body.theme-light select, body.theme-light textarea {
+      background: #f8fafc; color: #1e293b; border-color: #cbd5e1;
+    }
+    body.theme-light .card { background: #fff; }
+    body.theme-light .header-bar { background: #fff; border-color: #cbd5e1; }
+    body.theme-light .tab-nav { background: #fff; border-color: #cbd5e1; }
+</style>
+  <link rel="manifest" href="manifest.json">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#f59e0b">
+  <script>
+    if ('serviceWorker' in navigator) {
+      const swCode = `
+        const CACHE='cp-v1';
+        self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.add(self.location.href)).then(() => self.skipWaiting())); });
+        self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>clients.claim())); });
+        self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))); });
+        self.addEventListener('message', e => { if(e.data==='skipWaiting') self.skipWaiting(); });
+      `;
+      const swBlob = new Blob([swCode], { type: 'application/javascript' });
+      navigator.serviceWorker.register(URL.createObjectURL(swBlob)).then(reg => {
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          nw.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+              _waitingWorker = nw;
+              document.getElementById('update-banner').style.display = 'flex';
+            }
+          });
+        });
+      }).catch(() => {});
+      navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
+    }
+  </script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <!-- Banner equipo activo (visible cuando se ve el equipo de otro) -->
+  <div id="team-banner" style="display:none;background:rgba(245,158,11,.1);border-bottom:2px solid rgba(245,158,11,.3);padding:8px 16px;align-items:center;justify-content:space-between;gap:8px;">
+    <span id="team-banner-text" style="font-size:13px;color:var(--accent3);font-weight:700"></span>
+    <span id="team-banner-role" style="font-size:11px;color:var(--text3);font-family:monospace;background:var(--surface2);padding:2px 8px;border-radius:999px;"></span>
+  </div>
+
+<header>
+  <h1>⚙️ Control de Personal</h1>
+  <div class="date-badge" id="headerDate"></div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('registro')">📋 Registro Diario</button>
+  <button class="tab-btn" onclick="switchTab('resumen')">📊 Resumen Mensual</button>
+  <button class="tab-btn" onclick="switchTab('datos')">💾 Datos</button>
+  <button class="tab-btn" id="btn-notas-admin" style="display:none;color:#f59e0b;background:transparent;border:none" onclick="toggleNotasAdmin()" title="Notas privadas">📓</button>
+  <button class="tab-btn" style="margin-left:auto;color:var(--accent3);background:transparent;border:none" onclick="showHelp()" title="Ayuda">❓</button>
+</div>
+
+<div class="main">
+
+  <!-- TAB REGISTRO DIARIO -->
+  <div id="tab-registro" class="tab-content active">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;gap:8px" id="sync-quick-bar">
+      <button onclick="descargarDesdeFirebase()" style="background:rgba(46,160,67,.12);color:var(--accent3);border:1px solid rgba(46,160,67,.2);border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit">⬇ Sync</button>
+      <button onclick="forzarSincronizacion()" style="background:rgba(96,165,250,.1);color:var(--accent);border:1px solid rgba(96,165,250,.2);border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit">⬆ Subir</button>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>📅</span> Fecha del Registro</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Fecha</label>
+          <input type="date" id="inp-fecha">
+        </div>
+
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>👷</span> Empleados</div>
+      <div class="empleados-grid" id="empleados-grid"></div>
+    </div>
+
+    <button class="save-btn" onclick="guardarDia()">💾 GUARDAR DÍA</button>
+  </div>
+
+  <!-- TAB RESUMEN MENSUAL -->
+  <div id="tab-resumen" class="tab-content">
+    <div class="card">
+      <div class="card-title"><span>🔍</span> Filtro</div>
+      <div class="filter-row">
+        <div class="form-group">
+          <label>Mes</label>
+          <select id="filter-mes" onchange="renderResumen()">
+            <option value="0">Enero</option><option value="1">Febrero</option>
+            <option value="2">Marzo</option><option value="3">Abril</option>
+            <option value="4">Mayo</option><option value="5">Junio</option>
+            <option value="6">Julio</option><option value="7">Agosto</option>
+            <option value="8">Septiembre</option><option value="9">Octubre</option>
+            <option value="10">Noviembre</option><option value="11">Diciembre</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Año</label>
+          <input type="number" id="filter-anio" value="2026" oninput="renderResumen()">
+        </div>
+      </div>
+    </div>
+    <div id="resumen-content"></div>
+  </div>
+
+  <!-- TAB DATOS -->
+  <div id="tab-datos" class="tab-content">
+
+    <!-- GESTIÓN EMPLEADOS -->
+    <div class="card">
+      <div class="card-title"><span>👤</span> Gestión de Empleados</div>
+      <div class="empleados-admin" id="empleados-admin"></div>
+      <button class="add-emp-btn" onclick="addEmpleadoAdmin()">+ Añadir empleado</button>
+      <button class="save-btn" style="margin-top:14px" onclick="guardarEmpleados()">💾 GUARDAR CAMBIOS</button>
+    </div>
+
+    <!-- DIETA CONFIG -->
+    <div class="card">
+      <div class="card-title"><span>🍽️</span> Importe de Dietas</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Media dieta (€)</label>
+          <input type="number" id="cfg-media-dieta" value="15" min="0" step="0.5">
+        </div>
+      </div>
+      <button class="save-btn" style="margin-top:14px" onclick="guardarConfig()">💾 GUARDAR CONFIG</button>
+    </div>
+
+    <!-- BACKUP JSON -->
+    <div class="card">
+      <div class="card-title"><span>📦</span> Copia de Seguridad (JSON)</div>
+      <div class="data-btn-grid">
+        <button class="data-btn green" onclick="exportarJSON()">
+          <div class="db-icon">⬇️</div>
+          <div class="db-title">Exportar JSON</div>
+          <div class="db-desc">Descarga todos los datos en un archivo .json.</div>
+        </button>
+        <button class="data-btn blue" onclick="compartirJSON()">
+          <div class="db-icon">📤</div>
+          <div class="db-title">Compartir JSON</div>
+          <div class="db-desc">Comparte el archivo por Drive, WhatsApp, email u otras apps.</div>
+        </button>
+        <button class="data-btn blue" onclick="document.getElementById('import-input').click()">
+          <div class="db-icon">⬆️</div>
+          <div class="db-title">Importar JSON</div>
+          <div class="db-desc">Carga un archivo .json exportado previamente.</div>
+        </button>
+      </div>
+      <input type="file" id="import-input" accept=".json" style="display:none" onchange="importarJSON(event)">
+    </div>
+
+    <!-- EXPORT CSV -->
+    <div class="card">
+      <div class="card-title"><span>📊</span> Exportar a Excel / CSV</div>
+      <div class="data-btn-grid">
+        <button class="data-btn green" onclick="exportarCSV('todo')">
+          <div class="db-icon">📋</div>
+          <div class="db-title">Exportar Todo</div>
+          <div class="db-desc">Todos los registros en un CSV.</div>
+        </button>
+        <button class="data-btn blue" onclick="exportarCSV('mes')">
+          <div class="db-icon">📅</div>
+          <div class="db-title">Exportar Mes Actual</div>
+          <div class="db-desc">Solo los registros del mes seleccionado.</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- NUBE GIST -->
+    <!-- INVITACIONES PENDIENTES -->
+    <div id="pending-invites" style="display:none;margin-bottom:14px"></div>
+
+    <!-- SELECTOR DE EQUIPO -->
+    <div id="team-selector" class="card" style="display:none">
+      <div class="card-title"><span>👥</span> Equipo activo</div>
+      <select id="team-selector-dd" onchange="switchTeam(this.value)" style="width:100%;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px"></select>
+    </div>
+
+    <!-- GESTIÓN DEL EQUIPO -->
+    <div class="card" id="team-mgmt-card" style="display:none">
+      <div class="card-title"><span>👥</span> Miembros del equipo</div>
+      <div id="team-info"></div>
+      <div id="team-members-list" style="margin-bottom:12px"></div>
+      <!-- ADMIN: Generar código de acceso -->
+      <div id="invite-box" style="display:none;border-top:1px solid var(--border);padding-top:14px;margin-top:6px">
+        <label style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;display:block">🔑 Generar código de acceso</label>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5">Genera un código y dáselo a la persona. Tiene 7 días de validez y un solo uso. Cuando termine, elimínalo.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+          <select id="code-role" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:13px;flex:1">
+            <option value="viewer">👁 Solo ver</option>
+            <option value="editor-own">✏ Editor solo nuevos</option>
+            <option value="editor">✏ Editor completo</option>
+          </select>
+          <button class="cloud-sync-btn" onclick="generarCodigo()" style="padding:8px 16px">🔑 GENERAR CÓDIGO</button>
+        </div>
+        <div id="codigos-activos" style="margin-top:4px"></div>
+      </div>
+
+      <!-- USUARIO: Introducir código -->
+      <div id="usar-codigo-box" style="border-top:1px solid var(--border);padding-top:14px;margin-top:12px">
+        <label style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;display:block">¿Tienes un código de acceso?</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="inp-codigo" placeholder="Ej: ABC123" maxlength="6"
+            style="flex:1;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:14px;text-transform:uppercase;font-family:monospace;letter-spacing:3px">
+          <button class="cloud-sync-btn" onclick="usarCodigo()">✅ UNIRME</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAPELERA -->
+    <div class="card" id="trash-card" style="display:none">
+      <div class="card-title"><span>🗑</span> Papelera (30 días)</div>
+      <div id="trash-list"></div>
+    </div>
+
+    <!-- NOTAS PRIVADAS ADMIN (diario por empleado) -->
+    <div class="card" id="admin-notes-card" style="display:none">
+      <div class="card-title"><span>🔒</span> Notas privadas del administrador</div>
+      <p class="sync-info">Estas notas <strong style="color:var(--accent3)">solo las ves tú</strong>. Los demás miembros del equipo no tienen acceso, ni siquiera saben que existen. Puedes apuntar observaciones, incidencias o cualquier cosa sobre cada empleado.</p>
+      <div id="admin-notes-list" style="margin-top:14px"></div>
+    </div>
+
+    <!-- HISTORIAL DE CAMBIOS -->
+    <div class="card" id="audit-card" style="display:none">
+      <div class="card-title"><span>📜</span> Historial de cambios <span id="audit-badge" style="display:none;background:#ef4444;color:#fff;font-size:.65rem;border-radius:999px;padding:1px 6px;margin-left:.4rem;font-weight:700">NUEVO</span></div>
+      <div id="audit-list" style="max-height:340px;overflow-y:auto"></div>
+    </div>
+
+    <!-- FIREBASE -->
+    <div class="card">
+      <div class="card-title"><span>🔥</span> Sincronización Firebase</div>
+      <p class="sync-info">Datos sincronizados <strong style="color:var(--accent3)">en tiempo real</strong> entre todos tus dispositivos. Inicias sesión <strong>una sola vez</strong> con Google y queda guardado permanentemente.</p>
+
+      <!-- Estado: SIN configurar (oculto — config hardcodeada en el código) -->
+      <div id="fb-state-setup" style="display:none!important">
+        <p class="sync-info" style="margin-top:14px">
+          <strong style="color:var(--accent3)">Configuración inicial (una sola vez):</strong><br>
+          1. Ve a <strong>console.firebase.google.com</strong> y crea un proyecto<br>
+          2. Activa <strong>Authentication</strong> → habilita <strong>Google</strong><br>
+          3. Activa <strong>Firestore Database</strong> en modo producción<br>
+          4. ⚙️ Configuración del proyecto → "Tus apps" → añade <strong>Web app</strong><br>
+          5. Copia el objeto <code style="background:var(--surface2);padding:1px 5px;border-radius:3px">firebaseConfig</code> entero y pégalo aquí:
+        </p>
+        <textarea id="fb-config-input" placeholder='Pega aquí el objeto firebaseConfig completo' style="width:100%;min-height:140px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:10px;font-family:monospace;font-size:.8rem;margin-top:8px;box-sizing:border-box;resize:vertical;"></textarea>
+        <div style="margin-top:12px">
+          <button class="cloud-sync-btn" onclick="saveFirebaseConfig()">💾 GUARDAR CONFIGURACIÓN</button>
+        </div>
+      </div>
+
+      <!-- Estado: configurado, SIN sesión -->
+      <div id="fb-state-signin" style="display:none;">
+        <p class="sync-info" style="margin-top:14px;margin-bottom:12px">Firebase configurado ✓ — Inicia sesión:</p>
+        <button class="cloud-sync-btn" onclick="firebaseSignIn()">🔑 INICIAR SESIÓN CON GOOGLE</button>
+        <button class="cloud-sync-btn secondary" style="margin-left:8px" onclick="firebaseResetConfig()">⚙ CAMBIAR CONFIG</button>
+      </div>
+
+      <!-- Estado: con sesión activa -->
+      <div id="fb-state-active" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(46,160,67,.08);border:1px solid rgba(46,160,67,.3);border-radius:8px;margin:14px 0;">
+          <span style="font-size:1.6rem;">✅</span>
+          <div style="flex:1">
+            <div style="color:var(--accent3);font-weight:700;letter-spacing:1px">SINCRONIZADO · <span id="fb-my-role" style="color:var(--accent);font-weight:500;letter-spacing:.5px">—</span></div>
+            <div style="color:var(--text-dim);font-family:monospace;font-size:.78rem;margin-top:2px" id="fb-user-email"></div>
+          </div>
+        </div>
+        <div style="font-size:.78rem;color:var(--text-dim);margin-bottom:12px;font-family:monospace" id="fb-last-sync"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="cloud-sync-btn" onclick="forzarSincronizacion()">⬆ SUBIR A FIREBASE</button>
+          <button class="cloud-sync-btn" onclick="descargarDesdeFirebase()">⬇ DESCARGAR DE FIREBASE</button>
+          <button class="cloud-sync-btn secondary" onclick="firebaseSignOut()" style="color:var(--danger)">✕ CERRAR SESIÓN</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TEMA -->
+    <div class="card">
+      <div class="card-title"><span>🎨</span> Apariencia</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="cloud-sync-btn" id="theme-auto"  onclick="setTheme('auto')"  style="flex:1">🌗 Auto</button>
+        <button class="cloud-sync-btn" id="theme-dark"  onclick="setTheme('dark')"  style="flex:1">🌙 Oscuro</button>
+        <button class="cloud-sync-btn" id="theme-light" onclick="setTheme('light')" style="flex:1">☀️ Claro</button>
+      </div>
+    </div>
+
+    <!-- PELIGRO -->
+    <div class="card">
+      <div class="card-title" style="color:var(--danger)"><span>⚠️</span> Zona Peligrosa</div>
+      <div class="data-btn-grid">
+        <button class="data-btn danger" onclick="borrarTodo()">
+          <div class="db-icon">🗑️</div>
+          <div class="db-title">Borrar Todos los Datos</div>
+          <div class="db-desc">Elimina permanentemente todos los registros.</div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- UPDATE BANNER -->
+<div id="update-banner" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:10000;align-items:center;justify-content:center;">
+  <div style="background:#161b22;border:2px solid #f59e0b;border-radius:1.25rem;padding:2rem 2.25rem;max-width:380px;width:92%;box-shadow:0 24px 60px rgba(0,0,0,.6);text-align:center;">
+    <div style="font-size:2.5rem;margin-bottom:.75rem;">⚙️</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:2px;color:#f59e0b;margin-bottom:.5rem;">Nueva versión disponible</div>
+    <div style="font-size:.85rem;color:#8b949e;margin-bottom:1.5rem;line-height:1.6;">Hay una actualización de Control de Personal lista para instalar.</div>
+    <div style="display:flex;gap:.75rem;justify-content:center;">
+      <button onclick="document.getElementById('update-banner').style.display='none'" style="background:#30363d;color:#e6edf3;border:none;padding:.6rem 1.2rem;border-radius:.5rem;font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:600;cursor:pointer;">Ahora no</button>
+      <button onclick="applyUpdate()" style="background:#f59e0b;color:#000;border:none;padding:.6rem 1.4rem;border-radius:.5rem;font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:700;cursor:pointer;">⬆ Actualizar ahora</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const STORAGE_KEY = 'control-personal-v1';
+const STORAGE_EMP = 'control-personal-empleados';
+const STORAGE_CFG = 'control-personal-config';
+const GIST_FILENAME = 'control-personal-data.json';
+
+const MOTIVOS = [
+  { key: 'dieta_media', label: 'Media Dieta', badge: 'badge-dieta', hasAmount: false },
+  { key: 'dieta_completa', label: 'Dieta Completa', badge: 'badge-dieta', hasAmount: true, amountLabel: '€' },
+  { key: 'baja', label: 'Baja Médica', badge: 'badge-baja', hasAmount: false },
+  { key: 'vacaciones', label: 'Vacaciones', badge: 'badge-vac', hasAmount: false },
+  { key: 'permiso', label: 'Permiso Retribuido', badge: 'badge-ok', hasAmount: false },
+  { key: 'asuntos_propios', label: 'Asuntos Propios', badge: 'badge-ok', hasAmount: false },
+  { key: 'curso', label: 'Curso', badge: 'badge-ok', hasAmount: false },
+  { key: 'cedido_rd', label: 'Cedido Rd', badge: 'badge-cedido', hasAmount: false },
+  { key: 'cedido_fg', label: 'Cedido Fg', badge: 'badge-cedido', hasAmount: false },
+  { key: 'cedido_ra', label: 'Cedido Ra', badge: 'badge-cedido', hasAmount: false },
+  { key: 'horas_extra', label: 'Horas Extra', badge: 'badge-extra', hasAmount: true, amountLabel: 'h' },
+  { key: 'horas_nocturnas', label: 'Horas Nocturnas', badge: 'badge-extra', hasAmount: true, amountLabel: 'h' },
+  { key: 'reconocimiento', label: 'Reconoc. Médico', badge: 'badge-ok', hasAmount: false },
+  { key: 'jefe_provisional', label: 'Jefe Provisional', badge: 'badge-ok', hasAmount: false },
+  { key: 'conductor_provisional', label: 'Conductor Provisional', badge: 'badge-ok', hasAmount: false },
+  { key: 'falta', label: 'Falta', badge: 'badge-baja', hasAmount: false, hasText: true },
+];
+
+const DEFAULT_EMPLEADOS = [];  // Sin empleados por defecto — se añaden desde la app
+
+// ── INIT ────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('inp-fecha').value = today;
+  document.getElementById('headerDate').textContent = formatDate(today);
+  document.getElementById('filter-mes').value = new Date().getMonth();
+  document.getElementById('filter-anio').value = new Date().getFullYear();
+  const savedGist = localStorage.getItem('gistid-personal');
+  if (savedGist) document.getElementById('gh-gist-id').value = savedGist;
+  const cfg = getConfig();
+  document.getElementById('cfg-media-dieta').value = cfg.mediaDieta || 15;
+  renderEmpleadosAdmin();
+  renderEmpleadosGrid();
+  renderResumen();
+  // Tema
+  const savedTheme = localStorage.getItem('theme') || 'auto';
+  applyTheme(savedTheme);
+  ['auto','dark','light'].forEach(m => {
+    const btn = document.getElementById('theme-' + m);
+    if (btn) btn.style.borderColor = m === savedTheme ? 'var(--accent)' : 'var(--border)';
+  });
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if ((localStorage.getItem('theme') || 'auto') === 'auto') applyTheme('auto');
+  });
+  // Inicializar Firebase si está configurado
+  firebaseAutoInit();
+});
+
+// ── DATA ────────────────────────────────────────────────────────
+function getData() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; } }
+function saveData(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+function getEmpleados() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_EMP)) || DEFAULT_EMPLEADOS; } catch { return DEFAULT_EMPLEADOS; }
+}
+function saveEmpleados(e) { localStorage.setItem(STORAGE_EMP, JSON.stringify(e)); }
+function getConfig() { try { return JSON.parse(localStorage.getItem(STORAGE_CFG)) || { mediaDieta: 15 }; } catch { return { mediaDieta: 15 }; } }
+function saveConfig(c) { localStorage.setItem(STORAGE_CFG, JSON.stringify(c)); }
+
+// ── TABS ────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'resumen') renderResumen();
+  if (name === 'datos') renderEmpleadosAdmin();
+}
+
+// ── EMPLEADOS GRID (Registro Diario) ────────────────────────────
+function renderEmpleadosGrid() {
+  const empleados = getEmpleados();
+  const fecha = document.getElementById('inp-fecha').value;
+  const data = getData();
+  const existing = data.find(d => d.fecha === fecha);
+  const wrap = document.getElementById('empleados-grid');
+
+  wrap.innerHTML = empleados.map(nombre => {
+    const empData = existing ? existing.empleados.find(e => e.nombre === nombre) : null;
+    return buildEmpleadoRow(nombre, empData);
+  }).join('');
+
+  // Restaurar estados de checkboxes
+  if (existing) {
+    existing.empleados.forEach(empData => {
+      MOTIVOS.forEach(m => {
+        const cb = document.getElementById(`cb-${empData.nombre}-${m.key}`);
+        if (cb && empData[m.key]) {
+          cb.checked = true;
+          toggleCheck(cb, empData.nombre, m.key);
+          if (m.hasAmount) {
+            const inp = document.getElementById(`amt-${empData.nombre}-${m.key}`);
+            if (inp) inp.value = empData[m.key + '_amt'] || '';
+          }
+          if (m.hasText) {
+            const inp = document.getElementById(`txt-${empData.nombre}-${m.key}`);
+            if (inp) inp.value = empData[m.key + '_txt'] || '';
+          }
+        }
+      });
+      updateEmpleadoBadges(empData.nombre);
+    });
+  }
+}
+
+function buildEmpleadoRow(nombre, empData) {
+  const motivosHTML = MOTIVOS.map(m => {
+    let extra = '';
+    if (m.hasAmount) {
+      extra = `<input type="number" id="amt-${nombre}-${m.key}" placeholder="0" min="0" step="0.5" style="width:70px;padding:4px 8px;font-size:12px" oninput="autoCheckFromAmount(this,'${nombre}','${m.key}')">
+               <span style="font-size:11px;color:var(--text3)">${m.amountLabel}</span>`;
+    }
+    if (m.hasText) {
+      extra = `<input type="text" id="txt-${nombre}-${m.key}" placeholder="Motivo..." style="flex:1;padding:4px 8px;font-size:12px">`;
+    }
+    return `<div class="check-group" id="cg-${nombre}-${m.key}">
+      <input type="checkbox" id="cb-${nombre}-${m.key}" onchange="toggleCheck(this,'${nombre}','${m.key}')">
+      <label for="cb-${nombre}-${m.key}">${m.label}</label>
+      ${extra}
+    </div>`;
+  }).join('');
+
+  return `<div class="empleado-row" id="er-${nombre}">
+    <div class="empleado-header" onclick="toggleEmpleado('${nombre}')">
+      <div class="empleado-nombre">👷 ${nombre}</div>
+      <div class="empleado-badges" id="badges-${nombre}"></div>
+    </div>
+    <div class="emp-fields hidden" id="fields-${nombre}">
+      ${motivosHTML}
+      <div class="check-group" style="grid-column:1/-1">
+        <label style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--text2)">📝 Notas</label>
+        <input type="text" id="nota-${nombre}" placeholder="Observaciones..." style="flex:1;padding:4px 8px;font-size:12px">
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleEmpleado(nombre) {
+  const fields = document.getElementById('fields-' + nombre);
+  fields.classList.toggle('hidden');
+}
+
+function toggleCheck(cb, nombre, key) {
+  const cg = document.getElementById(`cg-${nombre}-${key}`);
+  if (cb.checked) {
+    cg.classList.add('activo');
+    document.getElementById(`er-${nombre}`).classList.add('tiene-datos');
+  } else {
+    cg.classList.remove('activo');
+  }
+  updateEmpleadoBadges(nombre);
+}
+
+function updateEmpleadoBadges(nombre) {
+  const badges = [];
+  MOTIVOS.forEach(m => {
+    const cb = document.getElementById(`cb-${nombre}-${m.key}`);
+    if (cb && cb.checked) {
+      let label = m.label;
+      if (m.hasAmount) {
+        const amt = document.getElementById(`amt-${nombre}-${m.key}`);
+        if (amt && amt.value) label += ` (${amt.value}${m.amountLabel})`;
+      }
+      badges.push(`<span class="badge ${m.badge}">${label}</span>`);
+    }
+  });
+  const wrap = document.getElementById('badges-' + nombre);
+  if (wrap) wrap.innerHTML = badges.join('');
+
+  // Si tiene algo marcado, mostrar borde verde en la fila
+  const row = document.getElementById('er-' + nombre);
+  if (badges.length > 0) row.classList.add('tiene-datos');
+  else row.classList.remove('tiene-datos');
+}
+
+// ── AUTO-CHECK DESDE AMOUNT ─────────────────────────────────────
+function autoCheckFromAmount(inputEl, nombre, key) {
+  const cb = document.getElementById(`cb-${nombre}-${key}`);
+  if (!cb) return;
+  if (parseFloat(inputEl.value) > 0) {
+    if (!cb.checked) {
+      cb.checked = true;
+      toggleCheck(cb, nombre, key);
+    }
+  } else {
+    cb.checked = false;
+    toggleCheck(cb, nombre, key);
+  }
+  updateEmpleadoBadges(nombre);
+}
+
+// ── GUARDAR DÍA ─────────────────────────────────────────────────
+async function guardarDia() {
+  const fecha = document.getElementById('inp-fecha').value;
+  if (!fecha) { showToast('⚠️ Introduce la fecha', 'warn'); return; }
+
+  const empleados = getEmpleados();
+  const registros = empleados.map(nombre => {
+    const emp = { nombre };
+    MOTIVOS.forEach(m => {
+      const cb = document.getElementById(`cb-${nombre}-${m.key}`);
+      emp[m.key] = cb ? cb.checked : false;
+      if (m.hasAmount) {
+        const inp = document.getElementById(`amt-${nombre}-${m.key}`);
+        emp[m.key + '_amt'] = inp ? (parseFloat(inp.value) || 0) : 0;
+      }
+      if (m.hasText) {
+        const inp = document.getElementById(`txt-${nombre}-${m.key}`);
+        emp[m.key + '_txt'] = inp ? inp.value : '';
+      }
+    });
+    const nota = document.getElementById(`nota-${nombre}`);
+    emp.notas = nota ? nota.value : '';
+    return emp;
+  });
+
+  const entry = { fecha, empleados: registros };
+
+  // Guardar local
+  const data = getData();
+  const idx = data.findIndex(d => d.fecha === fecha);
+  if (idx >= 0) data[idx] = entry; else data.push(entry);
+  data.sort((a, b) => a.fecha.localeCompare(b.fecha));
+  saveData(data);
+
+  // Renderizar inmediatamente con datos locales
+  renderResumen();
+
+  // Sincronizar con Firestore
+  if (_fbAuth?.currentUser && _teamId) {
+    try {
+      const ok = await fbSaveRegistro(entry);
+      if (ok) {
+        showToast('✅ Día guardado y sincronizado');
+      } else {
+        showToast('⚠️ Error de permisos — usa Forzar Sync en Datos', 'warn');
+      }
+    } catch(e) {
+      showToast('⚠️ Error Firebase — guardado solo local', 'warn');
+      console.error('guardarDia Firebase:', e);
+    }
+  } else {
+    // Firebase no está listo — guardar local y sincronizar cuando esté disponible
+    showToast('✅ Guardado local — sincronizando…');
+    // Reintentar sync cuando Firebase esté listo
+    const maxWait = 8000;
+    const start = Date.now();
+    const retry = setInterval(async () => {
+      if (_fbAuth?.currentUser && _teamId) {
+        clearInterval(retry);
+        const ok = await fbSaveRegistro(entry);
+        if (ok) showToast('☁️ Sincronizado con Firebase');
+      }
+      if (Date.now() - start > maxWait) {
+        clearInterval(retry);
+        showToast('⚠️ No se pudo sincronizar — usa Forzar Sync en Datos', 'warn');
+      }
+    }, 1000);
+  }
+}
+
+// ── RESUMEN MENSUAL ─────────────────────────────────────────────
+function renderResumen() {
+  const wrap = document.getElementById('resumen-content');
+  if (!wrap) return;
+  const mes  = parseInt(document.getElementById('filter-mes').value);
+  const anio = parseInt(document.getElementById('filter-anio').value);
+
+  // Filtrar datos del mes/año, parseando fechas de forma robusta
+  const data = getData().filter(d => {
+    if (!d.fecha) return false;
+    const fechaStr = String(d.fecha).slice(0, 10);
+    const parts = fechaStr.split('-');
+    if (parts.length !== 3) return false;
+    const y = parseInt(parts[0]);
+    const m = parseInt(parts[1]) - 1;  // JS months 0-11
+    return m === mes && y === anio;
+  });
+
+  // Limpiar siempre para forzar feedback visual al cambiar de mes
+  wrap.innerHTML = '';
+
+  if (!data.length) {
+    wrap.innerHTML = '<div class="card"><div style="text-align:center;padding:40px;color:var(--text3);font-size:13px"><div style="font-size:32px;margin-bottom:8px">📊</div>Sin datos para este mes.</div></div>';
+    return;
+  }
+
+  const cfg = getConfig();
+  const empleados = getEmpleados();
+  const diasTrabajados = data.length;
+
+  // Acumulados por empleado
+  const acum = {};
+  empleados.forEach(n => {
+    acum[n] = { mediaDietas: 0, completaDietas: 0, completaImporte: 0, baja: 0, vacaciones: 0, permiso: 0, asuntos: 0, curso: 0, cedido_rd: 0, cedido_fg: 0, cedido_ra: 0, hExtra: 0, hNocturnas: 0, reconocimiento: 0, jefe: 0, conductor: 0, faltas: 0, dias: [] };
+  });
+
+  data.forEach(d => {
+    if (!d.empleados || !Array.isArray(d.empleados)) return;
+    d.empleados.forEach(e => {
+      if (!acum[e.nombre]) return;
+      const a = acum[e.nombre];
+      const tieneAlgo = MOTIVOS.some(m => e[m.key]);
+      if (tieneAlgo || e.notas) a.dias.push({ fecha: d.fecha, emp: e });
+      if (e.dieta_media) a.mediaDietas++;
+      if (e.dieta_completa) { a.completaDietas++; a.completaImporte += e.dieta_completa_amt || 0; }
+      if (e.baja) a.baja++;
+      if (e.vacaciones) a.vacaciones++;
+      if (e.permiso) a.permiso++;
+      if (e.asuntos_propios) a.asuntos++;
+      if (e.curso) a.curso++;
+      if (e.cedido_rd) a.cedido_rd++;
+      if (e.cedido_fg) a.cedido_fg++;
+      if (e.cedido_ra) a.cedido_ra++;
+      if (e.horas_extra) a.hExtra += e.horas_extra_amt || 0;
+      if (e.horas_nocturnas) a.hNocturnas += e.horas_nocturnas_amt || 0;
+      if (e.reconocimiento) a.reconocimiento++;
+      if (e.jefe_provisional) a.jefe++;
+      if (e.conductor_provisional) a.conductor++;
+      if (e.falta) a.faltas++;
+    });
+  });
+
+  // Totales generales
+  const totalMediaDietas = empleados.reduce((s, n) => s + acum[n].mediaDietas, 0);
+  const totalCompletaDietas = empleados.reduce((s, n) => s + acum[n].completaDietas, 0);
+  const totalImporteMediaDietas = totalMediaDietas * (cfg.mediaDieta || 15);
+  const totalImporteCompletaDietas = empleados.reduce((s, n) => s + acum[n].completaImporte, 0);
+  const totalHExtra = empleados.reduce((s, n) => s + acum[n].hExtra, 0);
+  const totalHNocturnas = empleados.reduce((s, n) => s + acum[n].hNocturnas, 0);
+
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  // Tabla detalle por empleado
+  const tablaEmpleados = empleados.map(n => {
+    const a = acum[n];
+    const importeTotal = (a.mediaDietas * (cfg.mediaDieta || 15)) + a.completaImporte;
+    const cedidoStr = [a.cedido_rd ? `Rd:${a.cedido_rd}d` : '', a.cedido_fg ? `Fg:${a.cedido_fg}d` : '', a.cedido_ra ? `Ra:${a.cedido_ra}d` : ''].filter(Boolean).join(' ') || '—';
+    return `<tr>
+      <td style="font-weight:600;color:var(--text)">${n}</td>
+      <td>${a.mediaDietas > 0 ? `<span class="badge badge-dieta">${a.mediaDietas}d</span>` : '—'}</td>
+      <td>${a.completaDietas > 0 ? `<span class="badge badge-dieta">${a.completaDietas}d</span>` : '—'}</td>
+      <td style="color:var(--accent)">${importeTotal > 0 ? importeTotal.toFixed(2) + '€' : '—'}</td>
+      <td>${a.hExtra > 0 ? `<span class="badge badge-extra">${a.hExtra}h</span>` : '—'}</td>
+      <td>${a.hNocturnas > 0 ? `<span class="badge badge-extra">${a.hNocturnas}h</span>` : '—'}</td>
+      <td>${a.baja > 0 ? `<span class="badge badge-baja">${a.baja}d</span>` : '—'}</td>
+      <td>${a.vacaciones > 0 ? `<span class="badge badge-vac">${a.vacaciones}d</span>` : '—'}</td>
+      <td>${cedidoStr}</td>
+      <td>${[a.permiso?'Perm.':'', a.curso?'Curso':'', a.jefe?'Jefe':'', a.conductor?'Cond.':'', a.reconocimiento?'Rec.':'', a.faltas?`Falta(${a.faltas})`:''].filter(Boolean).join(', ') || '—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Detalle día a día (más reciente arriba)
+  const detalleDias = data.slice().sort((a,b) => b.fecha.localeCompare(a.fecha)).map(d => {
+    if (!d.empleados || !Array.isArray(d.empleados)) return '';
+    const filas = d.empleados.filter(e => MOTIVOS.some(m => e[m.key]) || e.notas).map(e => {
+      const items = MOTIVOS.filter(m => e[m.key]).map(m => {
+        let txt = m.label;
+        if (m.hasAmount && e[m.key + '_amt']) txt += ` (${e[m.key + '_amt']}${m.amountLabel})`;
+        if (m.hasText && e[m.key + '_txt']) txt += `: ${e[m.key + '_txt']}`;
+        return `<span class="badge ${m.badge}" style="margin:2px">${txt}</span>`;
+      }).join(' ');
+      const nota = e.notas ? `<span style="color:var(--text3);font-size:11px"> · ${e.notas}</span>` : '';
+      return `<tr>
+        <td style="color:var(--text);font-weight:500">${e.nombre}</td>
+        <td style="max-width:400px;white-space:normal">${items}${nota}</td>
+        <td style="white-space:nowrap">
+          <button class="del-btn" onclick="editarDia('${d.fecha}')" title="Editar">✏️</button>
+          <button class="del-btn" onclick="eliminarDiaCP('${d.fecha}')" title="Borrar" style="color:var(--danger);margin-left:4px">🗑</button>
+        </td>
+      </tr>`;
+    }).join('');
+    if (!filas) return '';
+    return `<tr style="background:var(--surface2)"><td colspan="3" style="font-weight:600;color:var(--accent);font-family:'Bebas Neue',sans-serif;letter-spacing:1px;font-size:14px">📅 ${formatDate(d.fecha)}</td></tr>${filas}`;
+  }).filter(Boolean).join('');
+
+  wrap.innerHTML = `
+    <div class="card">
+      <div class="card-title"><span>🎯</span> Resumen ${meses[mes]} ${anio}</div>
+      <div class="summary-grid">
+        <div class="sum-card"><div class="sum-val">${diasTrabajados}</div><div class="sum-label">Días con registro</div></div>
+        <div class="sum-card"><div class="sum-val" style="color:var(--accent)">${totalMediaDietas}</div><div class="sum-label">Medias Dietas</div><div class="sum-sub">${totalImporteMediaDietas.toFixed(2)}€ total</div></div>
+        ${totalCompletaDietas > 0 ? `<div class="sum-card"><div class="sum-val" style="color:var(--accent)">${totalCompletaDietas}</div><div class="sum-label">Dietas Completas</div><div class="sum-sub">${totalImporteCompletaDietas.toFixed(2)}€ total</div></div>` : ''}
+        <div class="sum-card"><div class="sum-val" style="color:var(--purple)">${totalHExtra}</div><div class="sum-label">Horas Extra</div></div>
+        <div class="sum-card"><div class="sum-val" style="color:var(--purple)">${totalHNocturnas}</div><div class="sum-label">Horas Nocturnas</div></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+      <button onclick="copiarWhatsApp()" style="display:flex;align-items:center;gap:8px;background:var(--accent2);color:#000;border:none;padding:12px 20px;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;cursor:pointer;transition:all 0.2s">
+        📋 COPIAR PARA WHATSAPP
+      </button>
+      <button onclick="compartirWhatsApp()" style="display:flex;align-items:center;gap:8px;background:var(--accent3);color:#fff;border:none;padding:12px 20px;border-radius:8px;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;cursor:pointer;transition:all 0.2s">
+        📤 COMPARTIR
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>👷</span> Detalle por Empleado — ${meses[mes]} ${anio}</div>
+      <div class="log-table-wrap">
+        <table>
+          <thead><tr>
+            <th>Empleado</th><th>½ Dieta</th><th>Dieta Comp.</th><th>Importe</th>
+            <th>H. Extra</th><th>H. Noct.</th><th>Baja</th><th>Vacac.</th><th>Cedido</th><th>Otros</th>
+          </tr></thead>
+          <tbody>${tablaEmpleados}</tbody>
+        </table>
+      </div>
+    </div>
+
+    ${detalleDias ? `
+    <div class="card">
+      <div class="card-title"><span>📋</span> Detalle Día a Día</div>
+      <div class="log-table-wrap">
+        <table>
+          <thead><tr><th>Empleado</th><th>Incidencias</th><th></th></tr></thead>
+          <tbody>${detalleDias}</tbody>
+        </table>
+      </div>
+    </div>` : ''}
+  `;
+}
+
+// ── EDITAR DÍA ──────────────────────────────────────────────────
+function eliminarDiaCP(fecha) {
+  if (!confirm('¿Mover el registro del ' + fecha + ' a la papelera? Se podrá recuperar durante 30 días.')) return;
+  (async () => {
+    if (_fbAuth?.currentUser && _teamId) {
+      // Si no tenemos el ID en caché, buscarlo en Firestore directamente
+      let regId = _registroDocs[fecha];
+      if (!regId) {
+        try {
+          const snap = await _fbDb.collection('teams').doc(_teamId).collection('registros')
+            .where('fecha', '==', fecha).where('deleted', '==', false).limit(1).get();
+          if (!snap.empty) {
+            regId = snap.docs[0].id;
+            _registroDocs[fecha] = regId;
+          }
+        } catch(e) { console.warn('Firestore lookup:', e); }
+      }
+      if (regId) {
+        await fbSoftDelete(fecha);
+        showToast('🗑 Movido a papelera');
+        return;
+      }
+    }
+    // Fallback: eliminar solo local
+    const data = getData().filter(d => d.fecha !== fecha);
+    saveData(data);
+    showToast('🗑 Registro eliminado (local)');
+    renderResumen();
+  })();
+}
+
+function editarDia(fecha) {
+  document.getElementById('inp-fecha').value = fecha;
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-registro').classList.add('active');
+  document.querySelector('.tab-btn[onclick*="registro"]').classList.add('active');
+  renderEmpleadosGrid();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  showToast('✏️ Editando día ' + formatDate(fecha));
+}
+
+// Al cambiar la fecha, recargar los datos de ese día
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('inp-fecha').addEventListener('change', () => renderEmpleadosGrid());
+});
+
+// ── GESTIÓN EMPLEADOS ───────────────────────────────────────────
+function renderEmpleadosAdmin() {
+  const empleados = getEmpleados();
+  const wrap = document.getElementById('empleados-admin');
+  wrap.innerHTML = empleados.map((n, i) => `
+    <div class="emp-admin-row">
+      <input type="text" value="${n}" id="emp-input-${i}" placeholder="Nombre empleado">
+      <button class="remove-emp-btn" onclick="removeEmpleadoAdmin(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function addEmpleadoAdmin() {
+  const empleados = getEmpleados();
+  empleados.push('');
+  saveEmpleados(empleados);
+  renderEmpleadosAdmin();
+}
+
+function removeEmpleadoAdmin(i) {
+  const empleados = getEmpleados();
+  empleados.splice(i, 1);
+  saveEmpleados(empleados);
+  renderEmpleadosAdmin();
+}
+
+function guardarEmpleados() {
+  const inputs = document.querySelectorAll('[id^="emp-input-"]');
+  const empleados = Array.from(inputs).map(i => i.value.trim()).filter(Boolean);
+  saveEmpleados(empleados);
+  renderEmpleadosGrid();
+  if (_fbAuth?.currentUser && _teamId) fbSaveSettings();
+  showToast('✅ Empleados guardados');
+}
+
+function guardarConfig() {
+  const mediaDieta = parseFloat(document.getElementById('cfg-media-dieta').value) || 15;
+  saveConfig({ mediaDieta });
+  showToast('✅ Configuración guardada');
+}
+
+// ── UTILS ───────────────────────────────────────────────────────
+function formatDate(str) {
+  if (!str) return '';
+  const [y, m, d] = str.split('-');
+  const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return `${d} ${months[parseInt(m)-1]} ${y}`;
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = type === 'warn' ? 'var(--accent)' : 'var(--accent2)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── EXPORT JSON ─────────────────────────────────────────────────
+function exportarJSON() {
+  const payload = { registros: getData(), empleados: getEmpleados(), config: getConfig() };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `control-personal-${new Date().toISOString().split('T')[0]}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast('✅ JSON exportado');
+}
+
+async function importarJSON(event) {
+  const file = event.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    try {
+      const imp = JSON.parse(e.target.result);
+      if (imp.registros) saveData(imp.registros);
+      if (imp.empleados) saveEmpleados(imp.empleados);
+      if (imp.config) saveConfig(imp.config);
+      showToast('✅ Datos importados correctamente');
+      renderEmpleadosGrid(); renderResumen();
+      // Subir a Firestore si hay sesión activa
+      if (_fbAuth?.currentUser && _teamId && imp.registros) {
+        showToast('☁️ Sincronizando con Firebase…');
+        await pushAllDataToFirestore(imp.registros);
+        // También settings
+        if (imp.empleados || imp.config) await fbSaveSettings().catch(()=>{});
+        showToast('✅ Todo sincronizado con Firebase');
+      }
+    } catch { showToast('⚠️ Archivo JSON inválido', 'warn'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+async function pushAllDataToFirestore(arr) {
+  if (!_fbAuth?.currentUser || !_teamId || !_fbDb) return;
+  const now = firebase.firestore.FieldValue.serverTimestamp();
+  for (const r of arr) {
+    const existingId = _registroDocs[r.fecha];
+    const data = { ...r, deleted: false, modifiedBy: _currentUser.uid, modifiedByEmail: _currentUser.email, modifiedAt: now };
+    if (existingId) {
+      await _fbDb.collection('teams').doc(_teamId).collection('registros').doc(existingId).set(data, { merge: true });
+    } else {
+      data.createdBy = _currentUser.uid;
+      data.createdByEmail = _currentUser.email;
+      data.createdAt = now;
+      await _fbDb.collection('teams').doc(_teamId).collection('registros').add(data);
+    }
+  }
+}
+
+// ── EXPORT CSV ──────────────────────────────────────────────────
+function exportarCSV(scope) {
+  let data = getData();
+  if (scope === 'mes') {
+    const mes = parseInt(document.getElementById('filter-mes').value);
+    const anio = parseInt(document.getElementById('filter-anio').value);
+    data = data.filter(d => { const dt = new Date(d.fecha + 'T00:00:00'); return dt.getMonth() === mes && dt.getFullYear() === anio; });
+  }
+  if (!data.length) { showToast('⚠️ No hay datos para exportar', 'warn'); return; }
+
+  const cfg = getConfig();
+  const headers = ['Fecha','Empleado','Media Dieta','Dieta Completa','Importe Dieta (€)','H. Extra','H. Nocturnas','Baja','Vacaciones','Permiso Retribuido','Asuntos Propios','Curso','Cedido Rd','Cedido Fg','Cedido Ra','Reconoc. Médico','Jefe Provisional','Conductor Provisional','Falta','Motivo Falta','Notas'];
+  const rows = [];
+  data.forEach(d => {
+    d.empleados.forEach(e => {
+      const importeDieta = (e.dieta_media ? (cfg.mediaDieta || 15) : 0) + (e.dieta_completa ? (e.dieta_completa_amt || 0) : 0);
+      rows.push([
+        d.fecha, e.nombre,
+        e.dieta_media ? 'Sí' : '', e.dieta_completa ? 'Sí' : '',
+        importeDieta > 0 ? importeDieta : '',
+        e.horas_extra ? (e.horas_extra_amt || '') : '', e.horas_nocturnas ? (e.horas_nocturnas_amt || '') : '',
+        e.baja ? 'Sí' : '', e.vacaciones ? 'Sí' : '', e.permiso ? 'Sí' : '',
+        e.asuntos_propios ? 'Sí' : '', e.curso ? 'Sí' : '',
+        e.cedido_rd ? 'Sí' : '', e.cedido_fg ? 'Sí' : '', e.cedido_ra ? 'Sí' : '',
+        e.reconocimiento ? 'Sí' : '', e.jefe_provisional ? 'Sí' : '', e.conductor_provisional ? 'Sí' : '',
+        e.falta ? 'Sí' : '', e.falta ? (e.falta_txt || '') : '',
+        e.notas || ''
+      ]);
+    });
+  });
+
+  const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [headers.map(escape).join(','), ...rows.map(r => r.map(escape).join(','))].join('\n');
+  const BOM = '\uFEFF';
+  const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `control-personal-${scope}-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  showToast('✅ CSV exportado');
+}
+
+// ── CLOUD GIST ──────────────────────────────────────────────────
+function setCloudStatus(ok, msg) {
+  const wrap = document.getElementById('cloud-status');
+  const dot = document.getElementById('cloud-dot');
+  const txt = document.getElementById('cloud-status-text');
+  wrap.style.display = 'flex';
+  dot.className = 'cloud-dot' + (ok ? '' : ' off');
+  txt.textContent = msg;
+}
+
+async function subirNube(silencioso = false) {
+  const token = document.getElementById('gh-token').value.trim();
+  if (!token) { showToast('⚠️ Introduce el GitHub Token', 'warn'); return; }
+  const payload = { registros: getData(), empleados: getEmpleados(), config: getConfig() };
+  const body = JSON.stringify(payload, null, 2);
+  let gistId = document.getElementById('gh-gist-id').value.trim();
+  setCloudStatus(false, 'Subiendo...');
+  try {
+    let res, json;
+    if (gistId) {
+      res = await fetch(`https://api.github.com/gists/${gistId}`, { method: 'PATCH', headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ files: { [GIST_FILENAME]: { content: body } } }) });
+    } else {
+      res = await fetch('https://api.github.com/gists', { method: 'POST', headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ description: 'Control de Personal - Datos', public: false, files: { [GIST_FILENAME]: { content: body } } }) });
+    }
+    json = await res.json();
+    if (!res.ok) throw new Error(json.message);
+    gistId = json.id;
+    document.getElementById('gh-gist-id').value = gistId;
+    localStorage.setItem('gistid-personal', gistId);
+    setCloudStatus(true, `Datos subidos · Gist: ${gistId}`);
+    if (!silencioso) showToast('✅ Datos sincronizados en la nube');
+    else showToast('☁️ Guardado y sincronizado');
+  } catch(err) { setCloudStatus(false, 'Error: ' + err.message); showToast('⚠️ Error al subir: ' + err.message, 'warn'); }
+}
+
+async function bajarNube() {
+  const token = document.getElementById('gh-token').value.trim();
+  const gistId = document.getElementById('gh-gist-id').value.trim() || localStorage.getItem('gistid-personal');
+  if (!token || !gistId) { showToast('⚠️ Introduce Token y Gist ID', 'warn'); return; }
+  setCloudStatus(false, 'Descargando...');
+  try {
+    const res = await fetch(`https://api.github.com/gists/${gistId}`, { headers: { 'Authorization': `token ${token}` } });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message);
+    const content = json.files[GIST_FILENAME]?.content;
+    if (!content) throw new Error('Archivo no encontrado en el Gist');
+    const imp = JSON.parse(content);
+    if (imp.registros) saveData(imp.registros);
+    if (imp.empleados) saveEmpleados(imp.empleados);
+    if (imp.config) saveConfig(imp.config);
+    document.getElementById('gh-gist-id').value = gistId;
+    localStorage.setItem('gistid-personal', gistId);
+    setCloudStatus(true, `${imp.registros?.length || 0} registros descargados`);
+    showToast(`✅ Datos descargados de la nube`);
+    renderEmpleadosGrid(); renderResumen();
+  } catch(err) { setCloudStatus(false, 'Error: ' + err.message); showToast('⚠️ Error al descargar: ' + err.message, 'warn'); }
+}
+
+
+// ── COMPARTIR WHATSAPP ───────────────────────────────────────────
+function generarTextoWhatsApp() {
+  const mes = parseInt(document.getElementById('filter-mes').value);
+  const anio = parseInt(document.getElementById('filter-anio').value);
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const data = getData().filter(d => {
+    const dt = new Date(d.fecha + 'T00:00:00');
+    return dt.getMonth() === mes && dt.getFullYear() === anio;
+  });
+
+  const empleados = getEmpleados();
+  const cfg = getConfig();
+  const lineas = [];
+  lineas.push(`📋 RESUMEN ${meses[mes].toUpperCase()} ${anio}`);
+  lineas.push('');
+
+  let hayAlgo = false;
+  empleados.forEach(nombre => {
+    const items = [];
+    let totalDietas = 0, totalExtra = 0, totalNocturnas = 0;
+    data.forEach(d => {
+      const e = d.empleados.find(x => x.nombre === nombre);
+      if (!e) return;
+      const partes = [];
+      if (e.dieta_media) { partes.push('Media Dieta'); totalDietas++; }
+      if (e.dieta_completa) { partes.push(`Dieta Completa${e.dieta_completa_amt ? ' (' + e.dieta_completa_amt + '€)' : ''}`); totalDietas++; }
+      if (e.horas_extra && e.horas_extra_amt > 0) { partes.push(`${e.horas_extra_amt}h Extra`); totalExtra += e.horas_extra_amt; }
+      if (e.horas_nocturnas && e.horas_nocturnas_amt > 0) { partes.push(`${e.horas_nocturnas_amt}h Nocturna`); totalNocturnas += e.horas_nocturnas_amt; }
+      if (partes.length) items.push(`  • ${formatDate(d.fecha)} — ${partes.join(' · ')}`);
+    });
+    if (items.length) {
+      hayAlgo = true;
+      lineas.push(`👷 ${nombre.toUpperCase()}`);
+      const totales = [];
+      if (totalDietas > 0) totales.push(`Total Dietas: ${totalDietas}`);
+      if (totalExtra > 0) totales.push(`Total H. Extra: ${totalExtra}`);
+      if (totalNocturnas > 0) totales.push(`Total H. Nocturnas: ${totalNocturnas}`);
+      if (totales.length) lineas.push(`  📌 ${totales.join(' · ')}`);
+      items.forEach(i => lineas.push(i));
+      lineas.push('');
+    }
+  });
+
+  if (!hayAlgo) return null;
+  return lineas.join('\n').trim();
+}
+
+function copiarWhatsApp() {
+  const texto = generarTextoWhatsApp();
+  if (!texto) { showToast('⚠️ Sin dietas ni horas este mes', 'warn'); return; }
+  navigator.clipboard.writeText(texto).then(() => {
+    showToast('✅ Texto copiado — pégalo en WhatsApp');
+  }).catch(() => {
+    // Fallback para móviles sin clipboard API
+    const ta = document.createElement('textarea');
+    ta.value = texto;
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('✅ Texto copiado — pégalo en WhatsApp');
+  });
+}
+
+function compartirWhatsApp() {
+  const texto = generarTextoWhatsApp();
+  if (!texto) { showToast('⚠️ Sin dietas ni horas este mes', 'warn'); return; }
+  if (navigator.share) {
+    navigator.share({ text: texto }).catch(() => {});
+  } else {
+    // Fallback: abrir WhatsApp Web
+    const url = 'https://wa.me/?text=' + encodeURIComponent(texto);
+    window.open(url, '_blank');
+  }
+}
+
+
+// ── COMPARTIR JSON ───────────────────────────────────────────────
+async function compartirJSON() {
+  const payload = { registros: getData(), empleados: getEmpleados(), config: getConfig() };
+  const json = JSON.stringify(payload, null, 2);
+  const filename = `control-personal-${new Date().toISOString().split('T')[0]}.json`;
+
+  if (navigator.share) {
+    try {
+      const file = new File([json], filename, { type: 'text/plain' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Backup Control de Personal', text: filename });
+        return;
+      }
+      await navigator.share({ title: 'Backup Control de Personal', text: json });
+      return;
+    } catch(e) {
+      if (e.name !== 'AbortError') {
+        // Fallback descarga
+      } else { return; }
+    }
+  }
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  a.click(); URL.revokeObjectURL(url);
+  showToast('⬇️ JSON descargado');
+}
+
+// ── BORRAR TODO ─────────────────────────────────────────────────
+function borrarTodo() {
+  if (!confirm('⚠️ ¿Borrar TODOS los datos? Esta acción no se puede deshacer.')) return;
+  if (!confirm('Segunda confirmación: ¿Borrar TODO permanentemente?')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(STORAGE_EMP);
+  showToast('🗑 Todos los datos eliminados');
+  renderResumen();
+}
+
+// ── ACTUALIZACIÓN ───────────────────────────────────────────────
+let _waitingWorker = null;
+function applyUpdate() {
+  document.getElementById('update-banner').style.display = 'none';
+  if (_waitingWorker) _waitingWorker.postMessage('skipWaiting');
+  else window.location.reload();
+}
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.ready.then(reg => {
+    if (reg.waiting) { _waitingWorker = reg.waiting; document.getElementById('update-banner').style.display = 'flex'; }
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing;
+      nw.addEventListener('statechange', () => {
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+          _waitingWorker = nw;
+          document.getElementById('update-banner').style.display = 'flex';
+        }
+      });
+    });
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+// FIREBASE v4.1 — Equipos compartidos, roles, audit, papelera
+// ════════════════════════════════════════════════════════════
+const FB_CONFIG_KEY  = 'firebaseConfig';
+const APP_TYPE       = 'controlpersonal';
+let _fbApp  = null;
+let _fbAuth = null;
+let _fbDb   = null;
+let _fbInitialized = false;
+let _fbSaveTimer = null;
+let _currentUser = null;
+let _teamId  = null;     // equipo activo
+let _teamData = null;    // metadatos del equipo activo
+let _myTeams  = [];      // todos los equipos del usuario
+let _myRole   = null;    // mi rol en el equipo activo
+let _trashRegistros = [];
+let _auditEntries = [];
+let _registroDocs = {};  // mapa fecha → _id (para edición)
+let _unsubTeam = null, _unsubReg = null, _unsubSettings = null, _unsubAudit = null;
+
+// ─── Configuración ───
+async function loadFbConfig() {
+  try { return JSON.parse(localStorage.getItem(FB_CONFIG_KEY)); } catch { return null; }
+}
+
+function parseFbConfig(text) {
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('No se encontró el objeto de configuración');
+  try { return (new Function('return ' + match[0]))(); }
+  catch(e) { throw new Error('Sintaxis inválida: ' + e.message); }
+}
+
+async function saveFirebaseConfig() {
+  const txt = document.getElementById('fb-config-input').value.trim();
+  if (!txt) { showToast('⚠️ Pega la configuración', 'warn'); return; }
+  let cfg;
+  try { cfg = parseFbConfig(txt); }
+  catch(e) { showToast('⚠️ Inválida: ' + e.message, 'warn'); return; }
+  if (!cfg.apiKey || !cfg.projectId) { showToast('⚠️ Incompleta', 'warn'); return; }
+  localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(cfg));
+  showToast('✅ Configuración guardada');
+  try { await initFirebase(cfg); updateFirebaseUI(); }
+  catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
+async function initFirebase(config) {
+  if (_fbInitialized) return;
+  if (!window.firebase) throw new Error('Firebase SDK no cargado');
+  _fbApp  = firebase.initializeApp(config);
+  _fbAuth = firebase.auth();
+  _fbDb   = firebase.firestore();
+  try { await _fbDb.enablePersistence({ synchronizeTabs: true }); } catch(e) {}
+  await _fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+  _fbAuth.onAuthStateChanged(handleFbAuthChange);
+  _fbInitialized = true;
+}
+
+async function handleFbAuthChange(user) {
+  if (user) {
+    _currentUser = user;
+    await fbInitForUser(user);
+  } else {
+    _currentUser = null;
+    _teamId = null;
+    _teamData = null;
+    _myTeams = [];
+    _myRole = null;
+    if (_unsubTeam) { _unsubTeam(); _unsubTeam = null; }
+    if (_unsubReg)  { _unsubReg();  _unsubReg = null; }
+    if (_unsubSettings) { _unsubSettings(); _unsubSettings = null; }
+    if (_unsubAudit) { _unsubAudit(); _unsubAudit = null; }
+  }
+  updateFirebaseUI();
+}
+
+async function firebaseSignIn() {
+  if (!_fbAuth) { showToast('⚠️ Configura Firebase primero', 'warn'); return; }
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await _fbAuth.signInWithPopup(provider);
+    showToast('✅ Sesión iniciada');
+  } catch(e) { showToast('⚠️ ' + (e.message || e.code), 'warn'); }
+}
+
+async function firebaseSignOut() {
+  if (!_fbAuth) return;
+  try { await _fbAuth.signOut(); showToast('✅ Sesión cerrada'); }
+  catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
+function firebaseResetConfig() {
+  if (!confirm('¿Cambiar la configuración de Firebase? Tendrás que pegar una nueva.')) return;
+  (async () => {
+    if (_fbAuth) { try { await _fbAuth.signOut(); } catch {} }
+    localStorage.removeItem(FB_CONFIG_KEY);
+    _fbInitialized = false;
+    _fbApp = null; _fbAuth = null; _fbDb = null;
+    updateFirebaseUI();
+    const el = document.getElementById('fb-config-input');
+    if (el) el.value = '';
+  })();
+}
+
+// ═══════════════════════════════════════════════
+// EQUIPOS Y MIGRACIÓN
+// ═══════════════════════════════════════════════
+async function fbInitForUser(user) {
+  try {
+    const teams = await findMyTeams();
+    if (teams.length === 0 || !teams.find(t => t.id === user.uid)) {
+      await createOwnTeam(user);
+    }
+    const allTeams = await findMyTeams();
+    _myTeams = allTeams;
+    const last = localStorage.getItem('lastTeamId');
+    if (last && allTeams.find(t => t.id === last && t.isMember)) {
+      _teamId = last;
+    } else {
+      // Si el usuario fue invitado a otro equipo, usarlo por defecto
+      const otherTeam = allTeams.find(t => t.id !== user.uid && t.isMember);
+      _teamId = otherTeam ? otherTeam.id : user.uid;
+    }
+    await tryMigrateV2(user);
+    subscribeToTeam(_teamId);
+  } catch(e) {
+    console.error('fbInitForUser error:', e);
+    showToast('⚠️ Error: ' + e.message, 'warn');
+  }
+}
+
+async function findMyTeams() {
+  if (!_currentUser || !_fbDb) return [];
+  const teams = [];
+  const seen = new Set();
+  try {
+    const memberSnap = await _fbDb.collection('teams')
+      .where('memberUids', 'array-contains', _currentUser.uid)
+      .where('appType', '==', APP_TYPE).get();
+    memberSnap.forEach(d => {
+      teams.push({ id: d.id, ...d.data(), isMember: true });
+      seen.add(d.id);
+    });
+  } catch(e) { console.warn('member query:', e); }
+  try {
+    const inviteSnap = await _fbDb.collection('teams')
+      .where('invitedEmails', 'array-contains', _currentUser.email.toLowerCase())
+      .where('appType', '==', APP_TYPE).get();
+    inviteSnap.forEach(d => {
+      if (!seen.has(d.id)) teams.push({ id: d.id, ...d.data(), isInvited: true });
+    });
+  } catch(e) { console.warn('invite query:', e); }
+  return teams;
+}
+
+async function createOwnTeam(user) {
+  await _fbDb.collection('teams').doc(user.uid).set({
+    ownerUid: user.uid,
+    ownerEmail: user.email,
+    name: 'Mi equipo',
+    appType: APP_TYPE,
+    members: { [user.uid]: { email: user.email, role: 'admin', joinedAt: firebase.firestore.FieldValue.serverTimestamp() } },
+    memberUids: [user.uid],
+    invitedEmails: [],
+    emailRoles: {},
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    schemaVersion: 3
+  });
+}
+
+async function tryMigrateV2(user) {
+  const oldRef = _fbDb.collection('controlpersonal').doc(user.uid);
+  let oldDoc;
+  try { oldDoc = await oldRef.get(); } catch(e) { return; }
+  if (!oldDoc.exists) return;
+  const oldData = oldDoc.data();
+  if (oldData.migratedV3) return;
+  const newRegSnap = await _fbDb.collection('teams').doc(user.uid).collection('registros').limit(1).get();
+  if (!newRegSnap.empty) { await oldRef.update({ migratedV3: true }); return; }
+  if (Array.isArray(oldData.registros) && oldData.registros.length > 0) {
+    const now = firebase.firestore.FieldValue.serverTimestamp();
+    for (const r of oldData.registros) {
+      await _fbDb.collection('teams').doc(user.uid).collection('registros').add({
+        ...r, createdBy: user.uid, createdByEmail: user.email, createdAt: now,
+        modifiedBy: user.uid, modifiedByEmail: user.email, modifiedAt: now,
+        deleted: false
+      });
+    }
+  }
+  await _fbDb.collection('teams').doc(user.uid).collection('settings').doc('main').set({
+    empleados: oldData.empleados || ['Yago', 'Juan', 'Jorge', 'Marcos', 'Braulio'],
+    config: oldData.config || {},
+    modifiedBy: user.uid, modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  await oldRef.update({ migratedV3: true });
+  showToast('☁️ Datos migrados a v3.0');
+  await logAudit('migrate_v2', { count: oldData.registros?.length || 0 });
+}
+
+function subscribeToTeam(teamId) {
+  if (_unsubTeam) _unsubTeam();
+  if (_unsubReg) _unsubReg();
+  if (_unsubSettings) _unsubSettings();
+  if (_unsubAudit) _unsubAudit();
+  _teamId = teamId;
+  localStorage.setItem('lastTeamId', teamId);
+
+  _unsubTeam = _fbDb.collection('teams').doc(teamId).onSnapshot(doc => {
+    if (!doc.exists) return;
+    _teamData = { id: doc.id, ...doc.data() };
+    _myRole = _teamData.members?.[_currentUser.uid]?.role || null;
+    updateFirebaseUI();
+    renderTeamMembers();
+    applyRoleRestrictions();
+  });
+
+  // Carga inicial inmediata de registros (sin esperar al listener)
+  _fbDb.collection('teams').doc(teamId).collection('registros').where('deleted', '==', false).get().then(snap => {
+    if (snap.empty) return;
+    const clean = snap.docs.map(d => {
+      const r = d.data();
+      const { _id, createdBy, createdByEmail, createdAt, modifiedBy, modifiedByEmail,
+              modifiedAt, deleted, deletedBy, deletedByEmail, deletedAt, autoPurgeAt, ...rest } = r;
+      if (!rest.empleados || !Array.isArray(rest.empleados)) rest.empleados = [];
+      return rest;
+    }).filter(r => r.fecha);
+    clean.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+    saveData(clean);
+    renderResumen && renderResumen();
+  }).catch(() => {});
+
+  _unsubReg = _fbDb.collection('teams').doc(teamId).collection('registros').onSnapshot(snap => {
+    const active = [], trash = [];
+    _registroDocs = {};
+    snap.docs.forEach(d => {
+      const r = { _id: d.id, ...d.data() };
+      if (r.deleted) trash.push(r);
+      else { active.push(r); _registroDocs[r.fecha] = d.id; }
+    });
+    _trashRegistros = trash;
+
+    // Limpiar campos internos antes de guardar localmente
+    const clean = active.map(r => {
+      const { _id, createdBy, createdByEmail, createdAt, modifiedBy, modifiedByEmail,
+              modifiedAt, deleted, deletedBy, deletedByEmail, deletedAt, autoPurgeAt,
+              ...rest } = r;
+      // Asegurar que empleados siempre es un array
+      if (!rest.empleados || !Array.isArray(rest.empleados)) rest.empleados = [];
+      return rest;
+    }).filter(r => r.fecha); // descartar registros sin fecha
+    clean.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+    saveData(clean);
+
+    renderEmpleadosAdmin && renderEmpleadosAdmin();
+    renderEmpleadosGrid && renderEmpleadosGrid();
+
+    // Auto-seleccionar mes más reciente con datos si el mes actual está vacío
+    autoSelectMesConDatos(clean);
+
+    renderResumen && renderResumen();
+    renderTrash();
+  });
+
+  _unsubSettings = _fbDb.collection('teams').doc(teamId).collection('settings').doc('main').onSnapshot(doc => {
+    if (!doc.exists) return;
+    const data = doc.data();
+    let changed = false;
+    if (Array.isArray(data.empleados) && data.empleados.length > 0) { saveEmpleados(data.empleados); changed = true; }
+    if (data.config) { saveConfig(data.config); changed = true; }
+    if (changed) {
+      renderEmpleadosAdmin && renderEmpleadosAdmin();
+      renderEmpleadosGrid && renderEmpleadosGrid();
+    }
+  });
+  // Descarga inmediata de ajustes + registros al entrar en el equipo
+  setTimeout(() => descargarDesdeFirebase(true), 500);
+
+  // Notas privadas admin (diario por empleado)
+  if (_myRole === 'admin') {
+    if (_unsubAdminNotes) _unsubAdminNotes();
+    _unsubAdminNotes = _fbDb.collection('teams').doc(teamId).collection('adminPrivate').doc('notes').onSnapshot(doc => {
+      _adminNotes = doc.exists ? (doc.data().notes || {}) : {};
+      renderAdminNotes();
+      // Si el panel lateral está abierto, actualizarlo también
+      const panel = document.getElementById('notas-admin-panel');
+      if (panel && panel.style.display !== 'none') renderAdminNotesPanel();
+    }, err => { _adminNotes = {}; renderAdminNotes(); });
+  }
+
+  _unsubAudit = _fbDb.collection('teams').doc(teamId).collection('audit')
+    .orderBy('timestamp', 'desc').limit(100).onSnapshot(snap => {
+    _auditEntries = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+    renderAuditLog();
+  });
+}
+
+// ═══════════════════════════════════════════════
+// CRUD CON AUDIT
+// ═══════════════════════════════════════════════
+async function fbSaveRegistro(registro) {
+  if (!_currentUser || !_fbDb || !_teamId) return false;
+  const existingId = _registroDocs[registro.fecha];
+  const now = firebase.firestore.FieldValue.serverTimestamp();
+  const data = {
+    ...registro,
+    modifiedBy: _currentUser.uid,
+    modifiedByEmail: _currentUser.email,
+    modifiedAt: now,
+    deleted: false
+  };
+  try {
+    if (existingId) {
+      await _fbDb.collection('teams').doc(_teamId).collection('registros').doc(existingId).update(data);
+      await logAudit('update', { fecha: registro.fecha, registroId: existingId });
+    } else {
+      data.createdBy = _currentUser.uid;
+      data.createdByEmail = _currentUser.email;
+      data.createdAt = now;
+      const ref = await _fbDb.collection('teams').doc(_teamId).collection('registros').add(data);
+      await logAudit('create', { fecha: registro.fecha, registroId: ref.id });
+    }
+    return true;
+  } catch(e) {
+    showToast('⚠️ Sin permisos', 'warn');
+    return false;
+  }
+}
+
+async function fbSoftDelete(fecha) {
+  const id = _registroDocs[fecha];
+  if (!id) return;
+  try {
+    const autoPurge = new Date(Date.now() + 30*86400000);
+    await _fbDb.collection('teams').doc(_teamId).collection('registros').doc(id).update({
+      deleted: true,
+      deletedBy: _currentUser.uid,
+      deletedByEmail: _currentUser.email,
+      deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      autoPurgeAt: firebase.firestore.Timestamp.fromDate(autoPurge)
+    });
+    await logAudit('delete', { fecha, registroId: id });
+  } catch(e) { showToast('⚠️ Sin permisos', 'warn'); }
+}
+
+async function fbRestore(registroId) {
+  try {
+    const reg = _trashRegistros.find(r => r._id === registroId);
+    await _fbDb.collection('teams').doc(_teamId).collection('registros').doc(registroId).update({
+      deleted: false, deletedBy: null, deletedByEmail: null, deletedAt: null, autoPurgeAt: null
+    });
+    await logAudit('restore', { fecha: reg?.fecha, registroId });
+  } catch(e) { showToast('⚠️ Sin permisos', 'warn'); }
+}
+
+async function fbPurge(registroId) {
+  try {
+    const reg = _trashRegistros.find(r => r._id === registroId);
+    await _fbDb.collection('teams').doc(_teamId).collection('registros').doc(registroId).delete();
+    await logAudit('purge', { fecha: reg?.fecha, registroId });
+  } catch(e) { showToast('⚠️ Sin permisos', 'warn'); }
+}
+
+async function fbSaveSettings() {
+  if (!_currentUser || !_fbDb || !_teamId) return;
+  if (_myRole !== 'admin' && _myRole !== 'editor') return;
+  try {
+    await _fbDb.collection('teams').doc(_teamId).collection('settings').doc('main').set({
+      empleados: getEmpleados(),
+      config: getConfig(),
+      modifiedBy: _currentUser.uid,
+      modifiedByEmail: _currentUser.email,
+      modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    await logAudit('settings_change', {});
+  } catch(e) {}
+}
+
+// ─── Notas privadas admin (diario por empleado) ───
+let _unsubAdminNotes = null;
+let _adminNotes = {};
+
+async function fbAddAdminNote(empleado) {
+  if (_myRole !== 'admin') return;
+  const ta = document.getElementById('admin-note-input-' + empleado.replace(/\s/g, '_'));
+  if (!ta) return;
+  const text = ta.value.trim();
+  if (!text) return;
+  const newEntry = {
+    text,
+    timestamp: new Date().toISOString(),
+    by: _currentUser.email
+  };
+  const empNotes = _adminNotes[empleado] || [];
+  empNotes.unshift(newEntry);  // más reciente primero
+  try {
+    await _fbDb.collection('teams').doc(_teamId).collection('adminPrivate').doc('notes').set({
+      notes: { ..._adminNotes, [empleado]: empNotes },
+      modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    ta.value = '';
+    showToast('✅ Nota añadida');
+  } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
+async function fbDeleteAdminNote(empleado, idx) {
+  if (_myRole !== 'admin') return;
+  if (!confirm('¿Borrar esta nota?')) return;
+  const empNotes = [...(_adminNotes[empleado] || [])];
+  empNotes.splice(idx, 1);
+  // Actualizar local inmediatamente
+  _adminNotes = { ..._adminNotes, [empleado]: empNotes };
+  renderAdminNotesPanel();
+  renderAdminNotes && renderAdminNotes();
+  showToast('✅ Nota eliminada');
+  try {
+    await _fbDb.collection('teams').doc(_teamId).collection('adminPrivate').doc('notes').set({
+      notes: _adminNotes,
+      modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
+function renderAdminNotes() {
+  const wrap = document.getElementById('admin-notes-list');
+  if (!wrap) return;
+  if (_myRole !== 'admin') { wrap.innerHTML = ''; return; }
+  const empleados = getEmpleados();
+  wrap.innerHTML = empleados.map(emp => {
+    const empKey = emp.replace(/\s/g, '_');
+    const notes = _adminNotes[emp] || [];
+    const notesHtml = notes.length === 0
+      ? '<div style="color:var(--text3);font-size:12px;padding:8px;font-style:italic">Sin notas</div>'
+      : notes.map((n, i) => {
+          const date = new Date(n.timestamp).toLocaleString('es');
+          return '<div style="background:var(--surface2);border-radius:6px;padding:10px 12px;margin-bottom:6px;font-size:13px;line-height:1.5;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
+            '<div style="flex:1;white-space:pre-wrap;color:var(--text)">' + n.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>' +
+            '<button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0;" onclick="fbDeleteAdminNote(\'' + emp + '\',' + i + ')" title="Borrar">✕</button>' +
+            '</div>' +
+            '<div style="margin-top:4px;color:var(--text3);font-size:10px;font-family:monospace">' + date + '</div>' +
+          '</div>';
+        }).join('');
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+      '<div style="font-weight:700;color:var(--text);letter-spacing:.5px">' + emp + '</div>' +
+      '<div style="font-size:11px;color:var(--text3)">' + notes.length + ' nota' + (notes.length !== 1 ? 's' : '') + '</div>' +
+      '</div>' +
+      '<textarea id="admin-note-input-' + empKey + '" placeholder="Añadir nota..." style="width:100%;min-height:60px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-family:inherit;font-size:13px;resize:vertical;box-sizing:border-box;margin-bottom:6px"></textarea>' +
+      '<button class="cloud-sync-btn secondary" style="padding:6px 14px;font-size:11px" onclick="fbAddAdminNote(\'' + emp + '\')">📝 AÑADIR NOTA</button>' +
+      '<div style="margin-top:10px">' + notesHtml + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function logAudit(action, details = {}) {
+  if (!_currentUser || !_teamId || !_fbDb) return;
+  try {
+    await _fbDb.collection('teams').doc(_teamId).collection('audit').add({
+      action,
+      actorUid: _currentUser.uid,
+      actorEmail: _currentUser.email,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      ...details
+    });
+    // Indicador visual de nueva entrada en historial
+    const badge = document.getElementById('audit-badge');
+    if (badge) { badge.style.display = 'inline'; setTimeout(() => badge.style.display = 'none', 5000); }
+  } catch(e) { console.warn('logAudit error:', e); }
+}
+
+// ═══════════════════════════════════════════════
+// GESTIÓN DE MIEMBROS
+// ═══════════════════════════════════════════════
+// ── SISTEMA DE CÓDIGOS DE ACCESO ─────────────────────────────
+function emailKey(email) { return email.replace(/\./g, ',').toLowerCase(); }
+
+const ROLE_LABELS = { admin: '👑 Admin', editor: '✏ Editor', 'editor-own': '✏ Solo nuevos', viewer: '👁 Solo ver' };
+
+async function generarCodigo() {
+  if (_myRole !== 'admin') { showToast('⚠️ Solo el admin puede generar códigos', 'warn'); return; }
+  const role = document.getElementById('code-role').value;
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  try {
+    await _fbDb.collection('inviteCodes').doc(code).set({
+      teamId: _teamId,
+      teamName: _teamData?.name || 'Mi equipo',
+      appType: APP_TYPE,
+      role,
+      createdBy: _currentUser.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      expiresAt: firebase.firestore.Timestamp.fromDate(expires),
+      used: false
+    });
+    await logAudit('invite_code_created', { code, role });
+    await cargarCodigosActivos();
+    showToast('✅ Código generado: ' + code);
+  } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
+async function eliminarCodigo(code) {
+  if (!confirm('¿Eliminar el código ' + code + '?')) return;
+  try {
+    await _fbDb.collection('inviteCodes').doc(code).delete();
+    await cargarCodigosActivos();
+    showToast('✅ Código eliminado');
+  } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
+async function cargarCodigosActivos() {
+  if (_myRole !== 'admin' || !_teamId) return;
+  const wrap = document.getElementById('codigos-activos');
+  if (!wrap) return;
+  try {
+    const snap = await _fbDb.collection('inviteCodes')
+      .where('teamId', '==', _teamId)
+      .where('used', '==', false)
+      .get();
+    if (snap.empty) { wrap.innerHTML = '<div style="font-size:12px;color:var(--text3)">No hay códigos activos.</div>'; return; }
+    wrap.innerHTML = '<div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-weight:600">CÓDIGOS ACTIVOS:</div>' +
+      snap.docs.map(d => {
+        const dt = d.data();
+        const exp = dt.expiresAt?.toDate ? dt.expiresAt.toDate().toLocaleDateString('es') : '?';
+        const roleLbl = ROLE_LABELS[dt.role] || dt.role;
+        return '<div style="display:flex;align-items:center;gap:8px;background:var(--surface2);border-radius:6px;padding:8px 12px;margin-bottom:6px;">' +
+          '<span style="font-family:monospace;font-size:1.1rem;font-weight:700;color:var(--accent3);letter-spacing:3px">' + d.id + '</span>' +
+          '<span style="font-size:11px;color:var(--text3);flex:1">' + roleLbl + ' · caduca ' + exp + '</span>' +
+          '<button onclick="eliminarCodigo(&quot;' + d.id + '&quot;)" style="background:rgba(239,68,68,.12);color:var(--danger);border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer">✕ Eliminar</button>' +
+        '</div>';
+      }).join('');
+  } catch(e) { console.warn('cargarCodigos:', e); }
+}
+
+async function usarCodigo() {
+  const code = (document.getElementById('inp-codigo').value || '').trim().toUpperCase();
+  if (!code || code.length !== 6) { showToast('⚠️ Introduce un código de 6 caracteres', 'warn'); return; }
+  if (!_fbAuth?.currentUser) { showToast('⚠️ Debes iniciar sesión primero', 'warn'); return; }
+  try {
+    const doc = await _fbDb.collection('inviteCodes').doc(code).get();
+    if (!doc.exists) { showToast('⚠️ Código inválido o ya usado', 'warn'); return; }
+    const dt = doc.data();
+    if (dt.used) { showToast('⚠️ Este código ya fue utilizado', 'warn'); return; }
+    if (dt.appType !== APP_TYPE) { showToast('⚠️ Código de otra aplicación', 'warn'); return; }
+    if (dt.expiresAt?.toDate && dt.expiresAt.toDate() < new Date()) { showToast('⚠️ El código ha caducado', 'warn'); return; }
+    if (dt.teamId === _currentUser.uid) { showToast('⚠️ No puedes unirte a tu propio equipo', 'warn'); return; }
+
+    // Unirse al equipo
+    await _fbDb.collection('teams').doc(dt.teamId).update({
+      [`members.${_currentUser.uid}`]: {
+        email: _currentUser.email,
+        role: dt.role,
+        joinedAt: firebase.firestore.FieldValue.serverTimestamp()
+      },
+      memberUids: firebase.firestore.FieldValue.arrayUnion(_currentUser.uid)
+    });
+
+    // Marcar código como usado
+    await doc.ref.update({ used: true, usedBy: _currentUser.uid, usedAt: firebase.firestore.FieldValue.serverTimestamp() });
+
+    // Cambiar al nuevo equipo
+    localStorage.setItem('lastTeamId', dt.teamId);
+    document.getElementById('inp-codigo').value = '';
+    const roleLbl = ROLE_LABELS[dt.role] || dt.role;
+    showToast('✅ Acceso concedido (' + roleLbl + '). Cargando datos del equipo…');
+    await fbInitForUser(_currentUser);
+  } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
+// Cuando admin abre la sección de equipo, cargar códigos activos
+async function fbInviteMember() {
+  cargarCodigosActivos(); // compatibilidad — ahora usa códigos
+}
+
+async function fbCancelInvite(email) {
+  // Ya no se usa, pero se mantiene por compatibilidad
+}
+
+async function fbChangeRole(uid, newRole) {
+  if (uid === _teamData.ownerUid) { showToast('⚠️ El propietario no cambia de rol', 'warn'); return; }
+  try {
+    await _fbDb.collection('teams').doc(_teamId).update({
+      [`members.${uid}.role`]: newRole
+    });
+    await logAudit('member_role_change', { targetUid: uid, role: newRole });
+    showToast('✅ Rol actualizado');
+  } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
+async function fbRemoveMember(uid) {
+  if (uid === _teamData.ownerUid) { showToast('⚠️ No se puede eliminar al propietario', 'warn'); return; }
+  const member = _teamData.members[uid];
+  if (!confirm('¿Eliminar a ' + (member?.email || 'este miembro') + ' del equipo?')) return;
+  try {
+    await _fbDb.collection('teams').doc(_teamId).update({
+      [`members.${uid}`]: firebase.firestore.FieldValue.delete(),
+      memberUids: firebase.firestore.FieldValue.arrayRemove(uid)
+    });
+    await logAudit('member_remove', { targetUid: uid, targetEmail: member?.email });
+    showToast('✅ Miembro eliminado');
+  } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
+async function acceptInvitation(teamId) {
+  const teamRef = _fbDb.collection('teams').doc(teamId);
+  const doc = await teamRef.get();
+  if (!doc.exists) return;
+  const data = doc.data();
+  const email = _currentUser.email.toLowerCase();
+  const role = data.emailRoles?.[emailKey(email)] || 'viewer';
+  try {
+    await teamRef.update({
+      [`members.${_currentUser.uid}`]: { email: _currentUser.email, role, joinedAt: firebase.firestore.FieldValue.serverTimestamp() },
+      memberUids: firebase.firestore.FieldValue.arrayUnion(_currentUser.uid),
+      invitedEmails: firebase.firestore.FieldValue.arrayRemove(email),
+      [`emailRoles.${emailKey(email)}`]: firebase.firestore.FieldValue.delete()
+    });
+    await logAudit('member_join', {});
+    // Cambiar automáticamente al equipo que se acaba de aceptar
+    localStorage.setItem('lastTeamId', teamId);
+    showToast('✅ Te has unido al equipo. Cambiando a sus datos…');
+    await fbInitForUser(_currentUser);
+  } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
+async function switchTeam(teamId) {
+  if (teamId === _teamId) return;
+  localStorage.setItem('lastTeamId', teamId);
+  subscribeToTeam(teamId);
+}
+
+// ═══════════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════════
+function updateFirebaseUI() {
+  const setup  = document.getElementById('fb-state-setup');
+  const signin = document.getElementById('fb-state-signin');
+  const active = document.getElementById('fb-state-active');
+  const teamMgmt = document.getElementById('team-mgmt-card');
+  const trashCard = document.getElementById('trash-card');
+  const auditCard = document.getElementById('audit-card');
+  const notesCard = document.getElementById('admin-notes-card');
+  if (!setup) return;
+  const isSignedIn = !!_fbAuth?.currentUser;
+  if (!_fbInitialized) { setup.style.display = 'none'; signin.style.display = 'block'; active.style.display = 'none'; }
+  else if (!isSignedIn) { setup.style.display = 'none'; signin.style.display = ''; active.style.display = 'none'; }
+  else {
+    setup.style.display = 'none'; signin.style.display = 'none'; active.style.display = '';
+    const u = _fbAuth.currentUser;
+    document.getElementById('fb-user-email').textContent = u.email || u.displayName || u.uid;
+    const roleLabel = { admin: '👑 Admin', editor: '✏ Editor', 'editor-own': '✏ Editor solo propios', viewer: '👁 Solo ver' }[_myRole] || '—';
+    const roleEl = document.getElementById('fb-my-role');
+    if (roleEl) roleEl.textContent = roleLabel;
+  }
+  if (teamMgmt)  teamMgmt.style.display  = isSignedIn ? '' : 'none';
+  const codigoBox = document.getElementById('usar-codigo-box');
+  if (codigoBox) codigoBox.style.display = isSignedIn ? '' : 'none';
+  if (trashCard) trashCard.style.display = isSignedIn ? '' : 'none';
+  if (auditCard) auditCard.style.display = isSignedIn ? '' : 'none';
+  if (notesCard) notesCard.style.display = (isSignedIn && _myRole === 'admin') ? '' : 'none';
+  // Botón de notas rápidas en nav
+  const btnNotas = document.getElementById('btn-notas-admin');
+  if (btnNotas) btnNotas.style.display = (isSignedIn && _myRole === 'admin') ? '' : 'none';
+}
+
+function renderTeamMembers() {
+  const wrap = document.getElementById('team-members-list');
+  if (!wrap || !_teamData) return;
+  const isAdmin = _myRole === 'admin';
+  const members = Object.entries(_teamData.members || {});
+  const invited = _teamData.invitedEmails || [];
+  const emailRoles = _teamData.emailRoles || {};
+
+  // Info del equipo actual
+  const teamInfo = document.getElementById('team-info');
+  if (teamInfo) {
+    const isOwnTeam = _teamId === _currentUser.uid;
+    teamInfo.innerHTML = isOwnTeam
+      ? '<div style="font-size:.78rem;color:var(--text3);margin-bottom:10px">Este es tu equipo propio.</div>'
+      : '<div style="font-size:.78rem;color:var(--accent3);margin-bottom:10px;font-weight:600">👥 Estás viendo el equipo de ' + (_teamData.ownerEmail || 'otro usuario') + '</div>';
+  }
+
+  let html = '';
+  members.forEach(([uid, m]) => {
+    const isOwner = uid === _teamData.ownerUid;
+    const isSelf  = uid === _currentUser.uid;
+    const roleLbl = { admin: '👑 Admin', editor: '✏ Editor', 'editor-own': '✏ Solo propios', viewer: '👁 Solo ver' }[m.role] || m.role;
+    html += `<div style="display:flex;align-items:center;gap:.6rem;padding:.55rem .75rem;background:var(--bg);border-radius:.5rem;margin-bottom:.4rem;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;">${m.email}${isOwner?' <span style="font-size:.7rem;color:var(--yellow);">(propietario)</span>':''}${isSelf?' <span style="font-size:.7rem;color:var(--blue);">(tú)</span>':''}</div>
+        <div style="font-size:.75rem;color:var(--muted);">${roleLbl}</div>
+      </div>`;
+    if (isAdmin && !isOwner) {
+      html += `<select onchange="fbChangeRole('${uid}', this.value)" style="font-size:.75rem;padding:.25rem .4rem;min-width:0;width:auto;">
+        <option value="admin"${m.role==='admin'?' selected':''}>Admin</option>
+        <option value="editor"${m.role==='editor'?' selected':''}>Editor</option>
+        <option value="editor-own"${m.role==='editor-own'?' selected':''}>Solo propios</option>
+        <option value="viewer"${m.role==='viewer'?' selected':''}>Solo ver</option>
+      </select>
+      <button class="btn btn-sm" style="background:rgba(239,68,68,.15);color:var(--red);" onclick="fbRemoveMember('${uid}')" title="Eliminar">✕</button>`;
+    }
+    html += `</div>`;
+  });
+  if (invited.length > 0) {
+    html += '<div style="font-size:.75rem;color:var(--muted);margin:.75rem 0 .4rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Invitaciones pendientes</div>';
+    invited.forEach(email => {
+      const role = emailRoles[emailKey(email)] || 'viewer';
+      const roleLbl = { admin: '👑 Admin', editor: '✏ Editor', 'editor-own': '✏ Solo propios', viewer: '👁 Solo ver' }[role] || role;
+      html += `<div style="display:flex;align-items:center;gap:.6rem;padding:.55rem .75rem;background:rgba(245,158,11,.06);border:1px dashed rgba(245,158,11,.3);border-radius:.5rem;margin-bottom:.4rem;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:.85rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;color:var(--yellow);">⏳ ${email}</div>
+          <div style="font-size:.75rem;color:var(--muted);">${roleLbl} — pendiente de aceptar</div>
+        </div>`;
+      if (isAdmin) html += `<button class="btn btn-sm btn-ghost" onclick="fbCancelInvite('${email}')" title="Cancelar">✕</button>`;
+      html += `</div>`;
+    });
+  }
+  wrap.innerHTML = html || '<div style="color:var(--muted);font-size:.85rem;padding:1rem;text-align:center;">Sin miembros aún</div>';
+
+  // Mostrar/ocultar zona de invitación
+  const inviteBox = document.getElementById('invite-box');
+  if (inviteBox) {
+    inviteBox.style.display = isAdmin ? 'block' : 'none';
+    if (isAdmin) cargarCodigosActivos();
+  }
+
+  // Selector de equipo si hay más de uno
+  renderTeamSelector();
+}
+
+function renderTeamSelector() {
+  const sel = document.getElementById('team-selector');
+  if (!sel) return;
+  const teamsToShow = _myTeams.filter(t => t.isMember);
+  if (teamsToShow.length <= 1) { sel.style.display = 'none'; return; }
+  sel.style.display = 'block';
+  const dd = document.getElementById('team-selector-dd');
+  dd.innerHTML = teamsToShow.map(t => `<option value="${t.id}"${t.id===_teamId?' selected':''}>${t.name}${t.id===_currentUser.uid?' (mío)':''}</option>`).join('');
+
+  // Mostrar invitaciones pendientes
+  const pending = _myTeams.filter(t => t.isInvited);
+  const pendBox = document.getElementById('pending-invites');
+  if (pendBox) {
+    if (pending.length === 0) pendBox.style.display = 'none';
+    else {
+      pendBox.style.display = 'block';
+      pendBox.innerHTML = pending.map(t => `<div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.3);border-radius:.5rem;margin-bottom:.5rem;">
+        <div style="flex:1;font-size:.85rem;">Invitación a <strong>${t.name}</strong></div>
+        <button class="btn btn-blue btn-sm" onclick="acceptInvitation('${t.id}')">Aceptar</button>
+      </div>`).join('');
+    }
+  }
+}
+
+function renderTrash() {
+  const wrap = document.getElementById('trash-list');
+  if (!wrap) return;
+  if (_trashRegistros.length === 0) {
+    wrap.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:1rem;text-align:center;">Papelera vacía</div>';
+    return;
+  }
+  const sorted = [..._trashRegistros].sort((a,b) => (b.deletedAt?.seconds || 0) - (a.deletedAt?.seconds || 0));
+  wrap.innerHTML = sorted.map(r => {
+    const delDate = r.deletedAt?.toDate ? r.deletedAt.toDate().toLocaleString('es') : '—';
+    const purgeDate = r.autoPurgeAt?.toDate ? r.autoPurgeAt.toDate().toLocaleDateString('es') : '—';
+    return `<div style="display:flex;align-items:center;gap:.6rem;padding:.6rem .85rem;background:var(--bg);border:1px solid var(--border);border-radius:.5rem;margin-bottom:.4rem;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.85rem;font-weight:600;font-family:var(--mono);">${fmtFecha(r.fecha)} — ${r.metros||0} m</div>
+        <div style="font-size:.7rem;color:var(--muted);">Borrado: ${delDate} por ${r.deletedByEmail || '?'}</div>
+        <div style="font-size:.7rem;color:var(--red);">Se eliminará el ${purgeDate}</div>
+      </div>
+      <button class="btn btn-green btn-sm" onclick="fbRestore('${r._id}')" title="Recuperar">↺</button>
+      ${_myRole === 'admin' ? `<button class="btn btn-sm" style="background:rgba(239,68,68,.15);color:var(--red);" onclick="confirmPurge('${r._id}')" title="Borrar definitivo">✕</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function confirmPurge(id) {
+  if (confirm('¿Borrar definitivamente este registro? No se podrá recuperar.')) fbPurge(id);
+}
+
+function renderAuditLog() {
+  const wrap = document.getElementById('audit-list');
+  if (!wrap) return;
+  if (_auditEntries.length === 0) {
+    wrap.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:1rem;text-align:center;">Sin actividad registrada</div>';
+    return;
+  }
+  const actionLabels = {
+    create:    { icon: '➕', text: 'Creó día', color: 'var(--green)' },
+    update:    { icon: '✏️', text: 'Modificó día', color: 'var(--blue)' },
+    delete:    { icon: '🗑', text: 'Borró día', color: 'var(--red)' },
+    restore:   { icon: '↺', text: 'Restauró día', color: 'var(--green)' },
+    purge:     { icon: '✕', text: 'Borró definitivamente', color: 'var(--red)' },
+    settings_change:    { icon: '⚙', text: 'Cambió ajustes', color: 'var(--muted)' },
+    member_invite:      { icon: '✉', text: 'Invitó a', color: 'var(--yellow)' },
+    member_remove:      { icon: '👤✕', text: 'Eliminó miembro', color: 'var(--red)' },
+    member_role_change: { icon: '🔄', text: 'Cambió rol', color: 'var(--blue)' },
+    member_join:        { icon: '✓', text: 'Se unió al equipo', color: 'var(--green)' },
+    migrate_v2:         { icon: '⬆', text: 'Migró datos a v3.0', color: 'var(--yellow)' }
+  };
+  wrap.innerHTML = _auditEntries.slice(0, 50).map(e => {
+    const lbl = actionLabels[e.action] || { icon: '?', text: e.action, color: 'var(--muted)' };
+    const date = e.timestamp?.toDate ? e.timestamp.toDate().toLocaleString('es') : '—';
+    let target = '';
+    if (e.fecha)        target = ` — ${fmtFecha(e.fecha)}`;
+    else if (e.targetEmail) target = ` — ${e.targetEmail}`;
+    return `<div style="display:flex;align-items:flex-start;gap:.6rem;padding:.5rem .75rem;border-bottom:1px solid var(--border);font-size:.82rem;">
+      <span style="font-size:1.05rem;line-height:1;">${lbl.icon}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="color:${lbl.color};font-weight:600;">${lbl.text}${target}</div>
+        <div style="font-size:.72rem;color:var(--muted);font-family:var(--mono);">${e.actorEmail} · ${date}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// RESTRICCIONES DE ROL EN UI
+// ═══════════════════════════════════════════════
+function applyRoleRestrictions() {
+  const canEdit = _myRole === 'admin' || _myRole === 'editor' || _myRole === 'editor-own';
+  const isViewer = _myRole === 'viewer';
+  const isOwnTeam = !_currentUser || _teamId === _currentUser.uid;
+  const ROLE_TEXT = { admin: '👑 Admin', editor: '✏ Editor', 'editor-own': '✏ Editor (solo nuevas entradas)', viewer: '👁 Solo lectura' };
+
+  // Banner de equipo externo (visible para invitados)
+  const teamBanner = document.getElementById('team-banner');
+  if (teamBanner) {
+    if (!isOwnTeam && _teamData && _myRole) {
+      const ownerName = (_teamData.ownerEmail || '').split('@')[0] || 'otro usuario';
+      const bannerText = document.getElementById('team-banner-text');
+      const bannerRole = document.getElementById('team-banner-role');
+      if (bannerText) bannerText.textContent = '👥 Viendo datos del equipo de ' + ownerName;
+      if (bannerRole) bannerRole.textContent = ROLE_TEXT[_myRole] || _myRole;
+      teamBanner.style.display = 'flex';
+    } else {
+      teamBanner.style.display = 'none';
+    }
+  }
+
+  // Pestaña Registro: visible para editores, oculta para solo ver
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    if (btn.textContent.includes('Registro')) {
+      btn.style.display = canEdit ? '' : 'none';
+    }
+  });
+
+  // Botón guardar
+  const btnGuardar = document.querySelector('button[onclick="guardarDia()"]');
+  if (btnGuardar) btnGuardar.style.display = canEdit ? '' : 'none';
+
+  if (isViewer) {
+    // Viewer: ir al resumen con los datos del equipo
+    switchTab('resumen');
+    renderResumen();
+  }
+
+}
+
+
+// Config Firebase hardcodeada — los usuarios no necesitan configurar nada
+const FIREBASE_CONFIG_HARDCODED = {
+  apiKey: "AIzaSyBRNabjKQ5RikSyhppzPHXo4rAeQk6Y8Sk",
+  authDomain: "fibracontrol-16a50.firebaseapp.com",
+  projectId: "fibracontrol-16a50",
+  storageBucket: "fibracontrol-16a50.firebasestorage.app",
+  messagingSenderId: "541136457242",
+  appId: "1:541136457242:web:57cc57af8c931397d4cba3",
+  measurementId: "G-GYV6RGSTSJ"
+};
+
+async function firebaseAutoInit() {
+  try {
+    await initFirebase(FIREBASE_CONFIG_HARDCODED);
+  } catch(e) { console.error('Firebase init error:', e); }
+  updateFirebaseUI();
+}
+
+// ═══════════════════════════════════════════════
+// AYUDA
+// ═══════════════════════════════════════════════
+// ── TEMA ─────────────────────────────────────────────
+function setTheme(mode) {
+  localStorage.setItem('theme', mode);
+  applyTheme(mode);
+  ['auto','dark','light'].forEach(m => {
+    const btn = document.getElementById('theme-' + m);
+    if (btn) btn.style.borderColor = m === mode ? 'var(--accent)' : 'var(--border)';
+  });
+}
+function applyTheme(mode) {
+  const body = document.body;
+  if (mode === 'light') body.classList.add('theme-light');
+  else if (mode === 'dark') body.classList.remove('theme-light');
+  else {
+    const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    body.classList.toggle('theme-light', !dark);
+  }
+}
+
+function toggleNotasAdmin() {
+  const panel = document.getElementById('notas-admin-panel');
+  const overlay = document.getElementById('notas-admin-overlay');
+  const isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  overlay.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) renderAdminNotesPanel();
+}
+
+function renderAdminNotesPanel() {
+  const wrap = document.getElementById('admin-notes-panel-list');
+  if (!wrap) return;
+  if (_myRole !== 'admin') { wrap.innerHTML = '<div style="color:var(--text3)">Sin acceso</div>'; return; }
+  const empleados = getEmpleados();
+  wrap.innerHTML = empleados.map(emp => {
+    const empKey = emp.replace(/\s/g, '_');
+    const notes = _adminNotes[emp] || [];
+    const notesHtml = notes.length === 0
+      ? '<div style="color:var(--text3);font-size:12px;font-style:italic;padding:6px 0">Sin notas</div>'
+      : notes.map((n, i) => {
+          const date = new Date(n.timestamp).toLocaleString('es');
+          return '<div style="background:var(--surface2);border-radius:6px;padding:8px 10px;margin-bottom:6px;font-size:12px;line-height:1.5;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">' +
+            '<div style="flex:1;color:var(--text);white-space:pre-wrap">' + n.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>' +
+            '<button onclick="fbDeleteAdminNote(\'' + emp + '\',' + i + ');renderAdminNotesPanel()" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:0;flex-shrink:0">✕</button>' +
+            '</div>' +
+            '<div style="color:var(--text3);font-size:10px;margin-top:3px;font-family:monospace">' + date + '</div>' +
+          '</div>';
+        }).join('');
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;">' +
+      '<div style="font-weight:700;color:var(--text);margin-bottom:8px;font-size:.85rem">' + emp + '</div>' +
+      '<textarea id="panelnote-' + empKey + '" placeholder="Añadir nota sobre ' + emp + '..." style="width:100%;min-height:55px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:6px 8px;font-size:12px;resize:vertical;box-sizing:border-box;font-family:inherit"></textarea>' +
+      '<button onclick="addNoteFromPanel(\'' + emp + '\')" style="margin-top:5px;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600">📝 Añadir</button>' +
+      (notes.length > 0 ? '<div style="margin-top:8px">' + notesHtml + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+async function addNoteFromPanel(emp) {
+  const empKey = emp.replace(/\s/g, '_');
+  const ta = document.getElementById('panelnote-' + empKey);
+  if (!ta || !ta.value.trim()) return;
+  const text = ta.value.trim();
+  const newEntry = { text, timestamp: new Date().toISOString(), by: _currentUser?.email || 'admin' };
+  const empNotes = [...(_adminNotes[emp] || [])];
+  empNotes.unshift(newEntry);
+  // Actualizar local inmediatamente para que renderice sin esperar Firestore
+  _adminNotes = { ..._adminNotes, [emp]: empNotes };
+  ta.value = '';
+  renderAdminNotesPanel();
+  showToast('✅ Nota añadida');
+  try {
+    await _fbDb.collection('teams').doc(_teamId).collection('adminPrivate').doc('notes').set({
+      notes: _adminNotes,
+      modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  } catch(e) { showToast('⚠️ Error guardando: ' + e.message, 'warn'); }
+}
+
+function autoSelectMesConDatos(registros) {
+  if (!registros || registros.length === 0) return;
+  const selMes  = document.getElementById('filter-mes');
+  const selAnio = document.getElementById('filter-anio');
+  if (!selMes || !selAnio) return;
+  const mesSel  = parseInt(selMes.value);
+  const anioSel = parseInt(selAnio.value);
+
+  // Comprobar si el mes actual tiene datos
+  const tieneActual = registros.some(d => {
+    if (!d.fecha) return false;
+    const parts = d.fecha.slice(0, 10).split('-');
+    return parseInt(parts[1]) - 1 === mesSel && parseInt(parts[0]) === anioSel;
+  });
+
+  if (!tieneActual) {
+    // Buscar el mes más reciente con datos
+    const fechas = registros
+      .filter(d => d.fecha)
+      .map(d => d.fecha.slice(0, 10))
+      .sort()
+      .reverse();
+    if (fechas.length > 0) {
+      const parts = fechas[0].split('-');
+      selAnio.value = parts[0];
+      selMes.value  = String(parseInt(parts[1]) - 1);
+    }
+  }
+}
+
+async function forzarSincronizacion() {
+  if (!_fbAuth?.currentUser) { showToast('⚠️ Debes iniciar sesión primero', 'warn'); return; }
+  if (!_teamId) { showToast('⚠️ Esperando equipo (intenta de nuevo en unos segundos)', 'warn'); return; }
+  const data = getData();
+  if (data.length === 0) { showToast('No hay datos locales que sincronizar', 'warn'); return; }
+  showToast('☁️ Subiendo ' + data.length + ' registros a Firebase…');
+  try {
+    await pushAllDataToFirestore(data);
+    await fbSaveSettings();
+    // Después de subir, descargar para confirmar que todo está bien
+    await descargarDesdeFirebase(true);
+    showToast('✅ Subida y descarga completadas (' + data.length + ' registros)');
+  } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
+}
+
+async function descargarDesdeFirebase(silencioso = false) {
+  if (!_fbAuth?.currentUser) { showToast('⚠️ Debes iniciar sesión primero', 'warn'); return; }
+  if (!_teamId) { showToast('⚠️ Esperando equipo (intenta de nuevo en unos segundos)', 'warn'); return; }
+  if (!silencioso) showToast('☁️ Descargando datos de Firebase…');
+  try {
+    // 1. Descargar empleados y configuración (settings)
+    const settingsDoc = await _fbDb.collection('teams').doc(_teamId)
+      .collection('settings').doc('main').get();
+    if (settingsDoc.exists) {
+      const s = settingsDoc.data();
+      if (Array.isArray(s.empleados) && s.empleados.length > 0) {
+        saveEmpleados(s.empleados);
+        renderEmpleadosGrid && renderEmpleadosGrid();
+        renderEmpleadosAdmin && renderEmpleadosAdmin();
+      }
+      if (s.config) saveConfig(s.config);
+    }
+    // 2. Descargar registros
+    const snap = await _fbDb.collection('teams').doc(_teamId)
+      .collection('registros').where('deleted', '==', false).get();
+
+    // Limpiar campos internos de Firestore
+    const records = snap.docs.map(d => {
+      const r = d.data();
+      const { createdBy, createdByEmail, createdAt, modifiedBy, modifiedByEmail,
+              modifiedAt, deleted, deletedBy, deletedByEmail, deletedAt, autoPurgeAt,
+              ...rest } = r;
+      // Asegurar que empleados siempre es un array válido
+      if (!rest.empleados || !Array.isArray(rest.empleados)) rest.empleados = [];
+      return rest;
+    }).filter(r => r.fecha); // descartar registros corruptos
+
+    // Ordenar por fecha
+    records.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+
+    saveData(records);
+    renderResumen();
+
+    if (!silencioso) showToast('✅ ' + records.length + ' registros descargados de Firebase');
+    updateFirebaseSyncTime();
+  } catch(e) { showToast('⚠️ Error al descargar: ' + e.message, 'warn'); }
+}
+
+function showHelp() {
+  document.getElementById('help-modal').style.display = 'flex';
+}
+function closeHelp() {
+  document.getElementById('help-modal').style.display = 'none';
+}
+
+
+// _cpReady backwards-compat (replaces Drive variable)
+Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) });
+
+</script>
+
+<!-- PANEL NOTAS ADMIN -->
+<div id="notas-admin-panel" style="display:none;position:fixed;top:0;right:0;width:min(420px,100vw);height:100vh;background:var(--bg);border-left:1px solid var(--border);z-index:5000;overflow-y:auto;box-shadow:-8px 0 40px rgba(0,0,0,.4);">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;">
+    <span style="font-weight:700;color:#f59e0b;font-size:.95rem;">📓 Notas privadas del admin</span>
+    <button onclick="toggleNotasAdmin()" style="background:none;border:none;color:var(--text3);font-size:1.4rem;cursor:pointer;line-height:1">✕</button>
+  </div>
+  <div style="padding:1rem">
+    <p style="font-size:.78rem;color:var(--text3);margin-bottom:1rem;line-height:1.5;">Solo tú las ves. Los demás miembros no saben que existen.</p>
+    <div id="admin-notes-panel-list"></div>
+  </div>
+</div>
+<div id="notas-admin-overlay" onclick="toggleNotasAdmin()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:4999;"></div>
+
+<!-- MODAL DE AYUDA -->
+<div id="help-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9998;align-items:center;justify-content:center;padding:1rem">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:14px;padding:24px 26px;max-width:540px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.6)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:2px;color:#f59e0b;margin:0">❓ AYUDA — CONTROL DE PERSONAL</h2>
+      <button onclick="closeHelp()" style="background:none;border:none;color:#8b949e;font-size:1.5rem;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div style="font-size:14px;line-height:1.65;color:#e6edf3">
+      <h3 style="font-size:.95rem;color:#60a5fa;margin:.5rem 0 .35rem">📋 Registro Diario</h3>
+      <p style="color:#8b949e;margin-bottom:.5rem">Selecciona la fecha y marca los conceptos de cada empleado (dietas, bajas, horas extras, etc.). Pulsa <b>Guardar día</b>.</p>
+
+      <h3 style="font-size:.95rem;color:#60a5fa;margin:.6rem 0 .35rem">📊 Resumen Mensual</h3>
+      <p style="color:#8b949e;margin-bottom:.5rem">Vista mensual con totales por empleado e importes. Detalle día a día con la entrada más reciente arriba.</p>
+
+      <h3 style="font-size:.95rem;color:#60a5fa;margin:.6rem 0 .35rem">👥 Equipos y roles</h3>
+      <p style="color:#8b949e;margin-bottom:.4rem">Cada usuario tiene su propio equipo (es admin). Puedes invitar a otros con uno de estos roles:</p>
+      <ul style="color:#8b949e;margin-left:1.2rem;margin-bottom:.5rem">
+        <li><b style="color:#f59e0b">👑 Admin</b>: control total — datos, miembros, notas privadas.</li>
+        <li><b style="color:#e6edf3">✏ Editor</b>: puede crear, editar y borrar cualquier día.</li>
+        <li><b style="color:#e6edf3">✏ Editor solo propios</b>: crea entradas nuevas y solo puede editar/borrar las suyas.</li>
+        <li><b style="color:#e6edf3">👁 Solo ver</b>: lectura, no modifica nada.</li>
+      </ul>
+
+      <h3 style="font-size:.95rem;color:#60a5fa;margin:.6rem 0 .35rem">🔒 Notas privadas del admin</h3>
+      <p style="color:#8b949e;margin-bottom:.5rem">Como admin, en la pestaña Datos tienes una sección de notas privadas por empleado tipo diario. Solo tú las ves — ni siquiera saben que existen.</p>
+
+      <h3 style="font-size:.95rem;color:#60a5fa;margin:.6rem 0 .35rem">🗑 Papelera</h3>
+      <p style="color:#8b949e;margin-bottom:.5rem">Los días borrados van a la papelera durante 30 días. Se pueden recuperar antes de que se eliminen automáticamente.</p>
+
+      <h3 style="font-size:.95rem;color:#60a5fa;margin:.6rem 0 .35rem">📜 Historial</h3>
+      <p style="color:#8b949e;margin-bottom:.5rem">Cada acción queda registrada con quién, cuándo y qué cambió. Aparece en la pestaña Datos.</p>
+
+      <h3 style="font-size:.95rem;color:#60a5fa;margin:.6rem 0 .35rem">🔄 Actualizaciones</h3>
+      <p style="color:#8b949e">Cuando hay versión nueva aparece un aviso central. Pulsa "Actualizar ahora" para recargar.</p>
+    </div>
+  </div>
+</div>
+
+<footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
+  <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.1
+  </span>
+</footer>
+</body>
+</html>
