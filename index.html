@@ -1293,7 +1293,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ════════════════════════════════════════════════════════════
-// FIREBASE v4.2 — Equipos compartidos, roles, audit, papelera
+// FIREBASE v4.3 — Equipos compartidos, roles, audit, papelera
 // ════════════════════════════════════════════════════════════
 const FB_CONFIG_KEY  = 'firebaseConfig';
 const APP_TYPE       = 'controlpersonal';
@@ -2170,6 +2170,11 @@ const FIREBASE_CONFIG_HARDCODED = {
   measurementId: "G-GYV6RGSTSJ"
 };
 
+function updateFirebaseSyncTime() {
+  const el = document.getElementById('fb-last-sync');
+  if (el) el.textContent = 'Último sync: ' + new Date().toLocaleString('es');
+}
+
 async function firebaseAutoInit() {
   try {
     await initFirebase(FIREBASE_CONFIG_HARDCODED);
@@ -2412,7 +2417,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.2
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.3
   </span>
 </footer>
 </body>
