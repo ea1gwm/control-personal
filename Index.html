@@ -405,7 +405,7 @@
       <!-- Estado: configurado, SIN sesión -->
       <div id="fb-state-signin" style="display:none;">
         <p class="sync-info" style="margin-top:14px;margin-bottom:12px">Firebase configurado ✓ — Inicia sesión:</p>
-        <button class="cloud-sync-btn" onclick="firebaseSignIn()">🔑 INICIAR SESIÓN CON GOOGLE</button>
+        <button class="cloud-sync-btn" id="btn-fb-signin" onclick="firebaseSignIn()">🔑 INICIAR SESIÓN CON GOOGLE</button>
         <button class="cloud-sync-btn secondary" style="margin-left:8px" onclick="firebaseResetConfig()">⚙ CAMBIAR CONFIG</button>
       </div>
 
@@ -1293,7 +1293,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ════════════════════════════════════════════════════════════
-// FIREBASE v4.1 — Equipos compartidos, roles, audit, papelera
+// FIREBASE v4.3 — Equipos compartidos, roles, audit, papelera
 // ════════════════════════════════════════════════════════════
 const FB_CONFIG_KEY  = 'firebaseConfig';
 const APP_TYPE       = 'controlpersonal';
@@ -1368,7 +1368,13 @@ async function handleFbAuthChange(user) {
 }
 
 async function firebaseSignIn() {
-  if (!_fbAuth) { showToast('⚠️ Configura Firebase primero', 'warn'); return; }
+  // Si Firebase no está listo, intentar inicializar primero
+  if (!_fbInitialized) {
+    showToast('⏳ Iniciando Firebase…');
+    await firebaseAutoInit();
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  if (!_fbAuth) { showToast('⚠️ Error cargando Firebase. Comprueba la conexión.', 'warn'); return; }
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
     await _fbAuth.signInWithPopup(provider);
@@ -1936,7 +1942,7 @@ function updateFirebaseUI() {
   const notesCard = document.getElementById('admin-notes-card');
   if (!setup) return;
   const isSignedIn = !!_fbAuth?.currentUser;
-  if (!_fbInitialized) { setup.style.display = 'none'; signin.style.display = 'block'; active.style.display = 'none'; }
+  if (!_fbInitialized) { setup.style.display = 'none'; signin.style.display = ''; active.style.display = 'none'; }
   else if (!isSignedIn) { setup.style.display = 'none'; signin.style.display = ''; active.style.display = 'none'; }
   else {
     setup.style.display = 'none'; signin.style.display = 'none'; active.style.display = '';
@@ -2163,6 +2169,11 @@ const FIREBASE_CONFIG_HARDCODED = {
   appId: "1:541136457242:web:57cc57af8c931397d4cba3",
   measurementId: "G-GYV6RGSTSJ"
 };
+
+function updateFirebaseSyncTime() {
+  const el = document.getElementById('fb-last-sync');
+  if (el) el.textContent = 'Último sync: ' + new Date().toLocaleString('es');
+}
 
 async function firebaseAutoInit() {
   try {
@@ -2406,7 +2417,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.1
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.3
   </span>
 </footer>
 </body>
