@@ -4,41 +4,41 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Control de Personal</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0d1117; --surface: #161b22; --surface2: #1f2937;
-    --border: #30363d; --accent: #f59e0b; --accent2: #10b981;
-    --accent3: #3b82f6; --danger: #ef4444; --purple: #8b5cf6;
-    --text: #e6edf3; --text2: #8b949e; --text3: #6e7681;
+    --bg: #1a1d24; --surface: #14171f; --surface2: #1f2530;
+    --border: #2a2f3a; --accent: #2563eb; --accent2: #10b981;
+    --accent3: #60a5fa; --danger: #ef4444; --purple: #8b5cf6;
+    --text: #e5e7eb; --text2: #94a3b8; --text3: #6b7280;
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; font-size: 14px; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; font-size: 14px; }
 
   header {
-    background: var(--surface); border-bottom: 2px solid var(--accent);
-    padding: 16px 24px; display: flex; align-items: center;
+    background: #0f1115; border-bottom: 1px solid var(--border);
+    padding: 10px 16px; display: flex; align-items: center;
     justify-content: space-between; position: sticky; top: 0; z-index: 100;
   }
-  header h1 { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; color: var(--accent); }
-  .date-badge { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text2); background: var(--surface2); padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); }
+  header h1 { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 18px; font-weight: 800; letter-spacing: -0.3px; color: var(--accent3); display: flex; align-items: center; gap: 8px; }
+  .date-badge { font-family: ui-monospace, 'Segoe UI Mono', monospace; font-size: 12px; color: var(--text2); background: var(--surface2); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); }
 
-  .tabs { display: flex; gap: 4px; padding: 16px 24px 0; border-bottom: 1px solid var(--border); background: var(--surface); flex-wrap: wrap; }
-  .tab-btn { background: none; border: none; color: var(--text2); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; padding: 10px 18px; cursor: pointer; border-radius: 6px 6px 0 0; border-bottom: 2px solid transparent; transition: all 0.2s; }
-  .tab-btn:hover { color: var(--text); }
-  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(245,158,11,0.05); }
+  .tabs { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: #0f1115; flex-wrap: wrap; }
+  .tab-btn { background: var(--surface2); border: 1px solid transparent; color: var(--text2); font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 12px; font-weight: 600; padding: 7px 12px; cursor: pointer; border-radius: 6px; transition: all 0.15s; }
+  .tab-btn:hover { color: var(--text); background: #2a3140; }
+  .tab-btn.active { color: #fff; background: var(--accent); border-color: var(--accent); }
 
   .main { padding: 24px; max-width: 1200px; margin: 0 auto; }
   .tab-content { display: none; }
   .tab-content.active { display: block; }
 
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
-  .card-title { font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 1.5px; color: var(--accent); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+  .card-title { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.2px; color: var(--accent3); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
 
   .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
   .form-group { display: flex; flex-direction: column; gap: 6px; }
   label { font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: 0.8px; text-transform: uppercase; }
-  input, select, textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 6px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color 0.2s; width: 100%; }
+  input, select, textarea { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: 6px; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 13px; outline: none; transition: border-color 0.2s; width: 100%; }
   input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   select option { background: var(--surface2); }
 
@@ -51,7 +51,7 @@
   .empleado-row:hover { border-color: var(--accent); }
   .empleado-row.tiene-datos { border-color: var(--accent2); }
   .empleado-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; cursor: pointer; }
-  .empleado-nombre { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 1px; color: var(--text); }
+  .empleado-nombre { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 18px; letter-spacing: 1px; color: var(--text); }
   .empleado-badges { display: flex; gap: 6px; flex-wrap: wrap; }
   .emp-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 10px; }
   .emp-fields.hidden { display: none; }
@@ -66,35 +66,35 @@
   .with-amount input[type=number] { width: 80px; flex-shrink: 0; }
 
   .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; }
-  .badge-dieta { background: rgba(245,158,11,0.15); color: var(--accent); }
+  .badge-dieta { background: rgba(245,158,11,0.15); color: #f59e0b; }
   .badge-baja { background: rgba(239,68,68,0.15); color: var(--danger); }
   .badge-vac { background: rgba(59,130,246,0.15); color: var(--accent3); }
   .badge-extra { background: rgba(139,92,246,0.15); color: var(--purple); }
   .badge-ok { background: rgba(16,185,129,0.15); color: var(--accent2); }
-  .badge-cedido { background: rgba(245,158,11,0.1); color: var(--accent); }
+  .badge-cedido { background: rgba(245,158,11,0.1); color: #f59e0b; }
 
-  .save-btn { background: var(--accent); color: #000; border: none; padding: 12px 28px; border-radius: 8px; font-family: 'Bebas Neue', sans-serif; font-size: 16px; letter-spacing: 1.5px; cursor: pointer; transition: all 0.2s; margin-top: 8px; }
-  .save-btn:hover { background: #fbbf24; transform: translateY(-1px); }
+  .save-btn { background: var(--accent); color: #fff; border: none; padding: 12px 28px; border-radius: 8px; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 700; letter-spacing: 0.3px; cursor: pointer; transition: all 0.15s; margin-top: 8px; box-shadow: 0 2px 12px rgba(37,99,235,0.35); }
+  .save-btn:hover { background: #1d4ed8; transform: translateY(-1px); }
 
   /* RESUMEN */
   .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
   .sum-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
-  .sum-val { font-family: 'Bebas Neue', sans-serif; font-size: 32px; line-height: 1; color: var(--accent); }
+  .sum-val { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 32px; line-height: 1; color: var(--accent); }
   .sum-label { font-size: 11px; color: var(--text2); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.8px; }
-  .sum-sub { font-size: 11px; color: var(--text3); margin-top: 4px; font-family: 'DM Mono', monospace; }
+  .sum-sub { font-size: 11px; color: var(--text3); margin-top: 4px; font-family: ui-monospace, 'Segoe UI Mono', monospace; }
 
   .log-table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: 'DM Mono', monospace; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: ui-monospace, 'Segoe UI Mono', monospace; }
   th { background: var(--surface2); color: var(--text2); font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
   td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text); white-space: nowrap; }
   tr:hover td { background: rgba(255,255,255,0.02); }
 
   /* DATA BUTTONS */
   .data-btn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
-  .data-btn { display: flex; flex-direction: column; align-items: flex-start; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; cursor: pointer; text-align: left; transition: all 0.2s; font-family: 'DM Sans', sans-serif; }
+  .data-btn { display: flex; flex-direction: column; align-items: flex-start; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; cursor: pointer; text-align: left; transition: all 0.2s; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; }
   .data-btn:hover { border-color: var(--accent); transform: translateY(-2px); }
   .data-btn .db-icon { font-size: 24px; margin-bottom: 10px; }
-  .data-btn .db-title { font-family: 'Bebas Neue', sans-serif; font-size: 15px; letter-spacing: 1.5px; color: var(--accent); margin-bottom: 4px; }
+  .data-btn .db-title { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 15px; letter-spacing: 1.5px; color: var(--accent); margin-bottom: 4px; }
   .data-btn .db-desc { font-size: 11px; color: var(--text3); line-height: 1.5; }
   .data-btn.green:hover { border-color: var(--accent2); }
   .data-btn.green .db-title { color: var(--accent2); }
@@ -105,11 +105,11 @@
 
   .inp-cloud { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
   .inp-cloud input { flex: 1; }
-  .cloud-sync-btn { background: var(--accent3); color: #fff; border: none; padding: 9px 16px; border-radius: 6px; font-family: 'Bebas Neue', sans-serif; font-size: 14px; letter-spacing: 1px; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+  .cloud-sync-btn { background: var(--accent3); color: #fff; border: none; padding: 9px 16px; border-radius: 6px; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 14px; letter-spacing: 1px; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
   .cloud-sync-btn:hover { background: #60a5fa; }
   .cloud-sync-btn.secondary { background: var(--surface2); color: var(--text2); }
   .cloud-sync-btn.secondary:hover { background: var(--border); color: var(--text); }
-  .cloud-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); margin-top: 12px; font-family: 'DM Mono', monospace; }
+  .cloud-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); margin-top: 12px; font-family: ui-monospace, 'Segoe UI Mono', monospace; }
   .cloud-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent2); }
   .cloud-dot.off { background: var(--text3); }
   .sync-info { font-size: 11px; color: var(--text3); margin-top: 6px; line-height: 1.6; }
@@ -125,7 +125,7 @@
   .emp-admin-row input { flex: 1; }
   .remove-emp-btn { background: none; border: 1px solid var(--border); color: var(--text3); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
   .remove-emp-btn:hover { border-color: var(--danger); color: var(--danger); }
-  .add-emp-btn { background: none; border: 1px dashed var(--border); color: var(--text2); padding: 10px; border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; width: 100%; transition: all 0.2s; margin-top: 8px; }
+  .add-emp-btn { background: none; border: 1px dashed var(--border); color: var(--text2); padding: 10px; border-radius: 8px; cursor: pointer; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 13px; width: 100%; transition: all 0.2s; margin-top: 8px; }
   .add-emp-btn:hover { border-color: var(--accent); color: var(--accent); }
 
   .filter-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 16px; }
@@ -156,11 +156,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#f59e0b">
+  <meta name="theme-color" content="#2563eb">
   <script>
     if ('serviceWorker' in navigator) {
       const swCode = `
-        const CACHE='cp-v4';
+        const CACHE='cp-v5';
         self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.add(self.location.href)).then(() => self.skipWaiting())); });
         self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>clients.claim())); });
         self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))); });
@@ -188,7 +188,7 @@
 </head>
 <body>
   <!-- Banner equipo activo (visible cuando se ve el equipo de otro) -->
-  <div id="team-banner" style="display:none;background:rgba(245,158,11,.1);border-bottom:2px solid rgba(245,158,11,.3);padding:8px 16px;align-items:center;justify-content:space-between;gap:8px;">
+  <div id="team-banner" style="display:none;background:rgba(37,99,235,.1);border-bottom:2px solid rgba(37,99,235,.3);padding:8px 16px;align-items:center;justify-content:space-between;gap:8px;">
     <span id="team-banner-text" style="font-size:13px;color:var(--accent3);font-weight:700"></span>
     <span id="team-banner-role" style="font-size:11px;color:var(--text3);font-family:monospace;background:var(--surface2);padding:2px 8px;border-radius:999px;"></span>
   </div>
@@ -202,7 +202,7 @@
   <button class="tab-btn active" onclick="switchTab('registro')">📋 Registro Diario</button>
   <button class="tab-btn" onclick="switchTab('resumen')">📊 Resumen Mensual</button>
   <button class="tab-btn" onclick="switchTab('datos')">💾 Datos</button>
-  <button class="tab-btn" id="btn-notas-admin" style="display:none;color:#f59e0b;background:transparent;border:none" onclick="toggleNotasAdmin()" title="Notas privadas">📓</button>
+  <button class="tab-btn" id="btn-notas-admin" style="display:none;color:#60a5fa;background:transparent;border:none" onclick="toggleNotasAdmin()" title="Notas privadas">📓</button>
   <button class="tab-btn" style="margin-left:auto;color:var(--accent3);background:transparent;border:none" onclick="showHelp()" title="Ayuda">❓</button>
 </div>
 
@@ -427,6 +427,16 @@
       </div>
     </div>
 
+    <!-- INSTALAR APP -->
+    <div class="card" id="install-card">
+      <div class="card-title"><span>📲</span> Instalar aplicación</div>
+      <p class="sync-info" id="install-desc">Instala Control de Personal en tu dispositivo para abrirla como una app, a pantalla completa y sin la barra del navegador.</p>
+      <div style="margin-top:12px">
+        <button class="cloud-sync-btn" id="btn-install" onclick="instalarApp()" style="display:none">📲 INSTALAR APP</button>
+      </div>
+      <div id="install-instructions" style="display:none;font-size:12px;color:var(--text2);line-height:1.7;margin-top:10px"></div>
+    </div>
+
     <!-- TEMA -->
     <div class="card">
       <div class="card-title"><span>🎨</span> Apariencia</div>
@@ -454,13 +464,13 @@
 
 <!-- UPDATE BANNER -->
 <div id="update-banner" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:10000;align-items:center;justify-content:center;">
-  <div style="background:#161b22;border:2px solid #f59e0b;border-radius:1.25rem;padding:2rem 2.25rem;max-width:380px;width:92%;box-shadow:0 24px 60px rgba(0,0,0,.6);text-align:center;">
+  <div style="background:#14171f;border:1px solid #2563eb;border-radius:1.25rem;padding:2rem 2.25rem;max-width:380px;width:92%;box-shadow:0 24px 60px rgba(0,0,0,.6);text-align:center;">
     <div style="font-size:2.5rem;margin-bottom:.75rem;">⚙️</div>
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:2px;color:#f59e0b;margin-bottom:.5rem;">Nueva versión disponible</div>
+    <div style="font-family:-apple-system,'Segoe UI',Roboto,sans-serif;font-size:1.3rem;font-weight:800;color:#60a5fa;margin-bottom:.5rem;">Nueva versión disponible</div>
     <div style="font-size:.85rem;color:#8b949e;margin-bottom:1.5rem;line-height:1.6;">Hay una actualización de Control de Personal lista para instalar.</div>
     <div style="display:flex;gap:.75rem;justify-content:center;">
       <button onclick="document.getElementById('update-banner').style.display='none'" style="background:#30363d;color:#e6edf3;border:none;padding:.6rem 1.2rem;border-radius:.5rem;font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:600;cursor:pointer;">Ahora no</button>
-      <button onclick="applyUpdate()" style="background:#f59e0b;color:#000;border:none;padding:.6rem 1.4rem;border-radius:.5rem;font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:700;cursor:pointer;">⬆ Actualizar ahora</button>
+      <button onclick="applyUpdate()" style="background:#2563eb;color:#fff;border:none;padding:.6rem 1.4rem;border-radius:.5rem;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;font-size:.875rem;font-weight:700;cursor:pointer;">⬆ Actualizar ahora</button>
     </div>
   </div>
 </div>
@@ -520,6 +530,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   // Inicializar Firebase si está configurado
   firebaseAutoInit();
+  // Estado del botón de instalación
+  refreshInstallUI();
 });
 
 // ── DATA ────────────────────────────────────────────────────────
@@ -2251,7 +2263,7 @@ function renderAdminNotesPanel() {
     return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;">' +
       '<div style="font-weight:700;color:var(--text);margin-bottom:8px;font-size:.85rem">' + emp + '</div>' +
       '<textarea id="panelnote-' + empKey + '" placeholder="Añadir nota sobre ' + emp + '..." style="width:100%;min-height:55px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:6px 8px;font-size:12px;resize:vertical;box-sizing:border-box;font-family:inherit"></textarea>' +
-      '<button onclick="addNoteFromPanel(\'' + emp + '\')" style="margin-top:5px;background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600">📝 Añadir</button>' +
+      '<button onclick="addNoteFromPanel(\'' + emp + '\')" style="margin-top:5px;background:rgba(37,99,235,.15);color:#60a5fa;border:1px solid rgba(37,99,235,.3);border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600">📝 Añadir</button>' +
       (notes.length > 0 ? '<div style="margin-top:8px">' + notesHtml + '</div>' : '') +
     '</div>';
   }).join('');
@@ -2366,6 +2378,67 @@ async function descargarDesdeFirebase(silencioso = false) {
   } catch(e) { showToast('⚠️ Error al descargar: ' + e.message, 'warn'); }
 }
 
+// ── INSTALAR PWA ─────────────────────────────────────
+let _deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _deferredInstallPrompt = e;
+  refreshInstallUI();
+});
+
+window.addEventListener('appinstalled', () => {
+  _deferredInstallPrompt = null;
+  showToast('✅ App instalada');
+  refreshInstallUI();
+});
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function refreshInstallUI() {
+  const card = document.getElementById('install-card');
+  const btn = document.getElementById('btn-install');
+  const desc = document.getElementById('install-desc');
+  const instr = document.getElementById('install-instructions');
+  if (!card) return;
+
+  if (isStandalone()) {
+    desc.textContent = '✅ Ya estás usando la app instalada.';
+    btn.style.display = 'none';
+    instr.style.display = 'none';
+    return;
+  }
+  if (_deferredInstallPrompt) {
+    // Android/Chrome/Edge: instalación con un toque
+    btn.style.display = '';
+    instr.style.display = 'none';
+  } else {
+    // iOS u otros navegadores: instrucciones manuales
+    btn.style.display = 'none';
+    const ua = navigator.userAgent;
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
+    instr.style.display = '';
+    if (isIOS) {
+      instr.innerHTML = '<strong style="color:var(--accent3)">En iPhone/iPad (Safari):</strong><br>1. Pulsa el botón <strong>Compartir</strong> (cuadro con flecha ↑).<br>2. Elige <strong>"Añadir a pantalla de inicio"</strong>.<br>3. Pulsa <strong>Añadir</strong>.';
+    } else {
+      instr.innerHTML = 'Abre el menú del navegador (⋮) y elige <strong>"Instalar aplicación"</strong> o <strong>"Añadir a pantalla de inicio"</strong>.';
+    }
+  }
+}
+
+async function instalarApp() {
+  if (!_deferredInstallPrompt) { refreshInstallUI(); return; }
+  _deferredInstallPrompt.prompt();
+  try {
+    const { outcome } = await _deferredInstallPrompt.userChoice;
+    if (outcome === 'accepted') showToast('✅ Instalando…');
+  } catch(e) {}
+  _deferredInstallPrompt = null;
+  refreshInstallUI();
+}
+
 function showHelp() {
   document.getElementById('help-modal').style.display = 'flex';
 }
@@ -2382,7 +2455,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 <!-- PANEL NOTAS ADMIN -->
 <div id="notas-admin-panel" style="display:none;position:fixed;top:0;right:0;width:min(420px,100vw);height:100vh;background:var(--bg);border-left:1px solid var(--border);z-index:5000;overflow-y:auto;box-shadow:-8px 0 40px rgba(0,0,0,.4);">
   <div style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;">
-    <span style="font-weight:700;color:#f59e0b;font-size:.95rem;">📓 Notas privadas del admin</span>
+    <span style="font-weight:700;color:#60a5fa;font-size:.95rem;">📓 Notas privadas del admin</span>
     <button onclick="toggleNotasAdmin()" style="background:none;border:none;color:var(--text3);font-size:1.4rem;cursor:pointer;line-height:1">✕</button>
   </div>
   <div style="padding:1rem">
@@ -2396,7 +2469,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 <div id="help-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9998;align-items:center;justify-content:center;padding:1rem">
   <div style="background:#161b22;border:1px solid #30363d;border-radius:14px;padding:24px 26px;max-width:540px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.6)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:2px;color:#f59e0b;margin:0">❓ AYUDA — CONTROL DE PERSONAL</h2>
+      <h2 style="font-family:-apple-system,'Segoe UI',Roboto,sans-serif;font-size:1.2rem;font-weight:800;color:#60a5fa;margin:0">❓ AYUDA — CONTROL DE PERSONAL</h2>
       <button onclick="closeHelp()" style="background:none;border:none;color:#8b949e;font-size:1.5rem;cursor:pointer;line-height:1">✕</button>
     </div>
     <div style="font-size:14px;line-height:1.65;color:#e6edf3">
@@ -2432,7 +2505,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.5
+    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.6
   </span>
 </footer>
 </body>
