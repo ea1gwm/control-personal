@@ -160,7 +160,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       const swCode = `
-        const CACHE='cp-v1';
+        const CACHE='cp-v3';
         self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.add(self.location.href)).then(() => self.skipWaiting())); });
         self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>clients.claim())); });
         self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))); });
@@ -1293,7 +1293,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // ════════════════════════════════════════════════════════════
-// FIREBASE v4.3 — Equipos compartidos, roles, audit, papelera
+// FIREBASE v4.4 — Equipos compartidos, roles, audit, papelera
 // ════════════════════════════════════════════════════════════
 const FB_CONFIG_KEY  = 'firebaseConfig';
 const APP_TYPE       = 'controlpersonal';
@@ -1367,18 +1367,26 @@ async function handleFbAuthChange(user) {
   updateFirebaseUI();
 }
 
+function isMobile() {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 async function firebaseSignIn() {
-  // Si Firebase no está listo, intentar inicializar primero
   if (!_fbInitialized) {
     showToast('⏳ Iniciando Firebase…');
     await firebaseAutoInit();
     await new Promise(r => setTimeout(r, 1000));
   }
   if (!_fbAuth) { showToast('⚠️ Error cargando Firebase. Comprueba la conexión.', 'warn'); return; }
+  const provider = new firebase.auth.GoogleAuthProvider();
   try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    await _fbAuth.signInWithPopup(provider);
-    showToast('✅ Sesión iniciada');
+    if (isMobile()) {
+      await _fbAuth.signInWithRedirect(provider);
+      // La página se recarga — el resultado se procesa en firebaseAutoInit
+    } else {
+      await _fbAuth.signInWithPopup(provider);
+      showToast('✅ Sesión iniciada');
+    }
   } catch(e) { showToast('⚠️ ' + (e.message || e.code), 'warn'); }
 }
 
@@ -2178,6 +2186,11 @@ function updateFirebaseSyncTime() {
 async function firebaseAutoInit() {
   try {
     await initFirebase(FIREBASE_CONFIG_HARDCODED);
+    // En móvil, procesar el resultado del redirect si volvemos de Google
+    if (isMobile()) {
+      const result = await _fbAuth.getRedirectResult().catch(() => null);
+      if (result?.user) showToast('✅ Sesión iniciada');
+    }
   } catch(e) { console.error('Firebase init error:', e); }
   updateFirebaseUI();
 }
@@ -2417,7 +2430,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.3
+    creado por <span style="color:#f59e0b;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.4
   </span>
 </footer>
 </body>
