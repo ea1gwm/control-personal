@@ -160,7 +160,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       const swCode = `
-        const CACHE='cp-v5';
+        const CACHE='cp-v6';
         self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.add(self.location.href)).then(() => self.skipWaiting())); });
         self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>clients.claim())); });
         self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))); });
@@ -1390,16 +1390,22 @@ async function firebaseSignIn() {
     await new Promise(r => setTimeout(r, 1000));
   }
   if (!_fbAuth) { showToast('⚠️ Error cargando Firebase. Comprueba la conexión.', 'warn'); return; }
+  // Asegurar persistencia LOCAL antes de iniciar sesión (sesión recordada para siempre)
+  try { await _fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(e) {}
   const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
   try {
-    if (isMobile()) {
-      await _fbAuth.signInWithRedirect(provider);
-      // La página se recarga — el resultado se procesa en firebaseAutoInit
+    // Popup funciona en móvil y escritorio. Si el navegador lo bloquea, caer a redirect.
+    await _fbAuth.signInWithPopup(provider);
+    showToast('✅ Sesión iniciada');
+  } catch(e) {
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment' || e.code === 'auth/cancelled-popup-request') {
+      try { await _fbAuth.signInWithRedirect(provider); }
+      catch(e2) { showToast('⚠️ ' + (e2.message || e2.code), 'warn'); }
     } else {
-      await _fbAuth.signInWithPopup(provider);
-      showToast('✅ Sesión iniciada');
+      showToast('⚠️ ' + (e.message || e.code), 'warn');
     }
-  } catch(e) { showToast('⚠️ ' + (e.message || e.code), 'warn'); }
+  }
 }
 
 async function firebaseSignOut() {
@@ -2201,8 +2207,8 @@ async function firebaseAutoInit() {
   } catch(e) { console.error('Firebase init error:', e); }
   // Pintar la UI de inmediato (no bloquear con el redirect)
   updateFirebaseUI();
-  // Procesar el resultado del redirect en segundo plano
-  if (_fbAuth && isMobile()) {
+  // Procesar el resultado del redirect en segundo plano (por si el popup cayó a redirect)
+  if (_fbAuth) {
     _fbAuth.getRedirectResult()
       .then(result => { if (result?.user) showToast('✅ Sesión iniciada'); })
       .catch(() => {});
@@ -2505,7 +2511,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.6
+    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.7
   </span>
 </footer>
 </body>
