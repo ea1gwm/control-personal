@@ -160,7 +160,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       const swCode = `
-        const CACHE='cp-v6';
+        const CACHE='cp-v7';
         self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.add(self.location.href)).then(() => self.skipWaiting())); });
         self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>clients.claim())); });
         self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))); });
@@ -1354,9 +1354,12 @@ async function initFirebase(config) {
   if (!window.firebase) throw new Error('Firebase SDK no cargado');
   _fbApp  = firebase.initializeApp(config);
   _fbAuth = firebase.auth();
+  // Fijar persistencia LOCAL ANTES de nada — la sesión se guarda en IndexedDB
+  // y sobrevive al cerrar la app. No activamos persistencia offline de Firestore
+  // porque su IndexedDB entra en conflicto con el de Auth en Chrome Android y
+  // provoca que la sesión se pierda al cerrar.
+  try { await _fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch(e) {}
   _fbDb   = firebase.firestore();
-  try { await _fbDb.enablePersistence({ synchronizeTabs: true }); } catch(e) {}
-  await _fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
   _fbAuth.onAuthStateChanged(handleFbAuthChange);
   _fbInitialized = true;
 }
@@ -2511,7 +2514,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.7
+    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.8
   </span>
 </footer>
 </body>

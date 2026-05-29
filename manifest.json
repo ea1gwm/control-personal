@@ -5,8 +5,8 @@
   "start_url": "/control-personal/",
   "scope": "/control-personal/",
   "display": "standalone",
-  "background_color": "#0d1117",
-  "theme_color": "#f59e0b",
+  "background_color": "#1a1d24",
+  "theme_color": "#2563eb",
   "orientation": "portrait-primary",
   "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
 }
