@@ -158,27 +158,27 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#2563eb">
   <script>
+    // Registro del service worker desde un archivo estable (sw.js).
+    // IMPORTANTE: NO recargamos automáticamente en 'controllerchange' — eso
+    // recargaba la página a destiempo y descartaba la sesión de Firebase Auth.
+    // Solo recargamos cuando el usuario pulsa "Actualizar ahora".
+    let _userTriggeredUpdate = false;
     if ('serviceWorker' in navigator) {
-      const swCode = `
-        const CACHE='cp-v7';
-        self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.add(self.location.href)).then(() => self.skipWaiting())); });
-        self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>clients.claim())); });
-        self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request))); });
-        self.addEventListener('message', e => { if(e.data==='skipWaiting') self.skipWaiting(); });
-      `;
-      const swBlob = new Blob([swCode], { type: 'application/javascript' });
-      navigator.serviceWorker.register(URL.createObjectURL(swBlob)).then(reg => {
+      navigator.serviceWorker.register('sw.js').then(reg => {
         reg.addEventListener('updatefound', () => {
           const nw = reg.installing;
           nw.addEventListener('statechange', () => {
             if (nw.state === 'installed' && navigator.serviceWorker.controller) {
               _waitingWorker = nw;
-              document.getElementById('update-banner').style.display = 'flex';
+              var b = document.getElementById('update-banner');
+              if (b) b.style.display = 'flex';
             }
           });
         });
       }).catch(() => {});
-      navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (_userTriggeredUpdate) window.location.reload();
+      });
     }
   </script>
   <!-- Firebase SDK -->
@@ -1286,6 +1286,7 @@ function borrarTodo() {
 let _waitingWorker = null;
 function applyUpdate() {
   document.getElementById('update-banner').style.display = 'none';
+  _userTriggeredUpdate = true;  // permite la recarga en controllerchange
   if (_waitingWorker) _waitingWorker.postMessage('skipWaiting');
   else window.location.reload();
 }
@@ -2514,7 +2515,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.8
+    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v4.9
   </span>
 </footer>
 </body>
