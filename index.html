@@ -448,6 +448,14 @@
       </div>
     </div>
 
+    <!-- DIAGNÓSTICO DE ALMACENAMIENTO (temporal) -->
+    <div class="card">
+      <div class="card-title"><span>🔍</span> Diagnóstico de almacenamiento</div>
+      <p class="sync-info">Pulsa el botón, luego <strong>recarga la página</strong> y vuelve a pulsarlo. Sirve para ver si el móvil guarda los datos entre recargas.</p>
+      <button class="cloud-sync-btn" onclick="ejecutarDiagnostico()" style="margin-top:10px">🔍 EJECUTAR DIAGNÓSTICO</button>
+      <pre id="diag-out" style="margin-top:12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;line-height:1.6;white-space:pre-wrap;color:var(--text);font-family:monospace"></pre>
+    </div>
+
     <!-- INSTALAR APP -->
     <div class="card" id="install-card">
       <div class="card-title"><span>📲</span> Instalar aplicación</div>
@@ -2486,6 +2494,51 @@ async function instalarApp() {
   refreshInstallUI();
 }
 
+// ── DIAGNÓSTICO DE ALMACENAMIENTO ────────────────────
+function idbTest(mode, val) {
+  return new Promise((resolve) => {
+    let req;
+    try { req = indexedDB.open('diag-db', 1); } catch(e) { return resolve('ERROR open: ' + e.message); }
+    req.onupgradeneeded = () => { req.result.createObjectStore('kv'); };
+    req.onerror = () => resolve('ERROR: ' + (req.error?.message || 'idb'));
+    req.onsuccess = () => {
+      const db = req.result;
+      try {
+        const tx = db.transaction('kv', mode === 'set' ? 'readwrite' : 'readonly');
+        const st = tx.objectStore('kv');
+        if (mode === 'set') { st.put(val, 'stamp'); tx.oncomplete = () => resolve('ok'); tx.onerror = () => resolve('ERROR write'); }
+        else { const g = st.get('stamp'); g.onsuccess = () => resolve(g.result || '(vacío)'); g.onerror = () => resolve('ERROR read'); }
+      } catch(e) { resolve('ERROR tx: ' + e.message); }
+    };
+  });
+}
+
+async function ejecutarDiagnostico() {
+  const out = document.getElementById('diag-out');
+  const L = [];
+  // 1) localStorage (lo que guardó la vez anterior)
+  L.push('localStorage anterior: ' + (localStorage.getItem('diag-stamp') || '(vacío)'));
+  // 2) IndexedDB (lo que guardó la vez anterior)
+  L.push('IndexedDB anterior:   ' + await idbTest('get'));
+  // 3) Sesión Firebase actual
+  L.push('Sesión Firebase:      ' + (_fbAuth?.currentUser ? _fbAuth.currentUser.email : 'NO logueado'));
+  // 4) Bases de datos IndexedDB existentes
+  try { const dbs = await indexedDB.databases(); L.push('Bases IndexedDB:      ' + (dbs.map(d=>d.name).join(', ') || '(ninguna)')); } catch(e) { L.push('Bases IndexedDB:      no consultable'); }
+  // 5) ¿Almacenamiento persistente concedido?
+  if (navigator.storage?.persisted) { try { L.push('Persistente:          ' + await navigator.storage.persisted()); } catch(e){} }
+  // Guardar marca de tiempo nueva
+  const now = new Date().toLocaleTimeString('es');
+  localStorage.setItem('diag-stamp', now);
+  const idbWrite = await idbTest('set', now);
+  L.push('────────────────────');
+  L.push('Guardado AHORA: ' + now + (idbWrite === 'ok' ? '' : '  (idb: ' + idbWrite + ')'));
+  L.push('');
+  L.push('➡ RECARGA la página y pulsa otra vez.');
+  L.push('Si "anterior" muestra esta hora → SÍ guarda.');
+  L.push('Si sigue "(vacío)" → el móvil BORRA los datos.');
+  out.textContent = L.join('\n');
+}
+
 function showHelp() {
   document.getElementById('help-modal').style.display = 'flex';
 }
@@ -2552,7 +2605,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v5.0
+    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v5.1
   </span>
 </footer>
 </body>
