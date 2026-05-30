@@ -1385,12 +1385,14 @@ async function initFirebase(config) {
   if (_fbInitialized) return;
   if (!window.FB) throw new Error('Firebase SDK no cargado');
   _fbApp  = FB.initializeApp(config);
-  // initializeAuth con persistencia LOCAL en IndexedDB del PROPIO sitio:
-  // la sesión se restaura al recargar/reabrir SIN depender de cookies de
-  // terceros (que Chrome bloquea). Esto resuelve el "pide login cada vez".
+  // initializeAuth con persistencia LOCAL en IndexedDB del PROPIO sitio.
+  // CLAVE: NO pasamos popupRedirectResolver aquí. Si se pasa, el SDK carga un
+  // iframe del dominio de Firebase (tercero) al ARRANCAR para restaurar la
+  // sesión, y Chrome lo bloquea (cookies de terceros) → pide login cada vez.
+  // Sin el resolver, la restauración lee solo IndexedDB local (sin terceros).
+  // El resolver se pasa puntualmente en signInWithPopup/Redirect (solo login).
   _fbAuth = FB.initializeAuth(_fbApp, {
-    persistence: [FB.indexedDBLocalPersistence, FB.browserLocalPersistence],
-    popupRedirectResolver: FB.browserPopupRedirectResolver
+    persistence: [FB.indexedDBLocalPersistence, FB.browserLocalPersistence]
   });
   _fbDb   = FB.getFirestore(_fbApp);
   FB.onAuthStateChanged(_fbAuth, handleFbAuthChange);
@@ -1429,12 +1431,13 @@ async function firebaseSignIn() {
   const provider = new FB.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   try {
-    // Popup funciona en móvil y escritorio. Si el navegador lo bloquea, caer a redirect.
-    await FB.signInWithPopup(_fbAuth, provider);
+    // Popup funciona en móvil y escritorio. El resolver (iframe de terceros)
+    // se usa SOLO aquí, durante el login. Si el navegador lo bloquea, caer a redirect.
+    await FB.signInWithPopup(_fbAuth, provider, FB.browserPopupRedirectResolver);
     showToast('✅ Sesión iniciada');
   } catch(e) {
     if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment' || e.code === 'auth/cancelled-popup-request') {
-      try { await FB.signInWithRedirect(_fbAuth, provider); }
+      try { sessionStorage.setItem('fb-redirect-pending', '1'); await FB.signInWithRedirect(_fbAuth, provider, FB.browserPopupRedirectResolver); }
       catch(e2) { showToast('⚠️ ' + (e2.message || e2.code), 'warn'); }
     } else {
       showToast('⚠️ ' + (e.message || e.code), 'warn');
@@ -2255,9 +2258,11 @@ async function firebaseAutoInit() {
   } catch(e) { console.error('Firebase init error:', e); }
   // Pintar la UI de inmediato (no bloquear con el redirect)
   updateFirebaseUI();
-  // Procesar el resultado del redirect en segundo plano (por si el popup cayó a redirect)
-  if (_fbAuth) {
-    FB.getRedirectResult(_fbAuth)
+  // Procesar el resultado del redirect SOLO si venimos de un redirect de login
+  // (así no cargamos el iframe de terceros en cada arranque normal).
+  if (_fbAuth && sessionStorage.getItem('fb-redirect-pending')) {
+    sessionStorage.removeItem('fb-redirect-pending');
+    FB.getRedirectResult(_fbAuth, FB.browserPopupRedirectResolver)
       .then(result => { if (result?.user) showToast('✅ Sesión iniciada'); })
       .catch(() => {});
   }
@@ -2605,7 +2610,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v5.1
+    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v5.2
   </span>
 </footer>
 </body>
