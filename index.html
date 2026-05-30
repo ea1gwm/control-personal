@@ -181,31 +181,10 @@
       });
     }
   </script>
-  <!-- Firebase SDK MODULAR (v10) — persistencia local sin cookies de terceros -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-    import {
-      initializeAuth, indexedDBLocalPersistence, browserLocalPersistence,
-      browserPopupRedirectResolver, GoogleAuthProvider, signInWithPopup,
-      signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged
-    } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
-    import {
-      getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc,
-      updateDoc, deleteDoc, onSnapshot, query, where, orderBy, limit,
-      serverTimestamp, Timestamp, arrayUnion, arrayRemove, deleteField
-    } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
-    window.FB = {
-      initializeApp, initializeAuth, indexedDBLocalPersistence, browserLocalPersistence,
-      browserPopupRedirectResolver, GoogleAuthProvider, signInWithPopup, signInWithRedirect,
-      getRedirectResult, signOut, onAuthStateChanged,
-      getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc,
-      onSnapshot, query, where, orderBy, limit, serverTimestamp, Timestamp,
-      arrayUnion, arrayRemove, deleteField
-    };
-    window.dispatchEvent(new Event('fb-ready'));
-    // Si la app ya esperaba, inicializa ahora
-    if (window._onFbReady) window._onFbReady();
-  </script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
   <!-- Banner equipo activo (visible cuando se ve el equipo de otro) -->
@@ -446,14 +425,6 @@
           <button class="cloud-sync-btn secondary" onclick="firebaseSignOut()" style="color:var(--danger)">✕ CERRAR SESIÓN</button>
         </div>
       </div>
-    </div>
-
-    <!-- DIAGNÓSTICO DE ALMACENAMIENTO (temporal) -->
-    <div class="card">
-      <div class="card-title"><span>🔍</span> Diagnóstico de almacenamiento</div>
-      <p class="sync-info">Pulsa el botón, luego <strong>recarga la página</strong> y vuelve a pulsarlo. Sirve para ver si el móvil guarda los datos entre recargas.</p>
-      <button class="cloud-sync-btn" onclick="ejecutarDiagnostico()" style="margin-top:10px">🔍 EJECUTAR DIAGNÓSTICO</button>
-      <pre id="diag-out" style="margin-top:12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px;font-size:11px;line-height:1.6;white-space:pre-wrap;color:var(--text);font-family:monospace"></pre>
     </div>
 
     <!-- INSTALAR APP -->
@@ -946,10 +917,8 @@ function eliminarDiaCP(fecha) {
       let regId = _registroDocs[fecha];
       if (!regId) {
         try {
-          const snap = await FB.getDocs(FB.query(
-            FB.collection(_fbDb, 'teams', _teamId, 'registros'),
-            FB.where('fecha', '==', fecha), FB.where('deleted', '==', false), FB.limit(1)
-          ));
+          const snap = await _fbDb.collection('teams').doc(_teamId).collection('registros')
+            .where('fecha', '==', fecha).where('deleted', '==', false).limit(1).get();
           if (!snap.empty) {
             regId = snap.docs[0].id;
             _registroDocs[fecha] = regId;
@@ -1081,17 +1050,17 @@ async function importarJSON(event) {
 
 async function pushAllDataToFirestore(arr) {
   if (!_fbAuth?.currentUser || !_teamId || !_fbDb) return;
-  const now = FB.serverTimestamp();
+  const now = firebase.firestore.FieldValue.serverTimestamp();
   for (const r of arr) {
     const existingId = _registroDocs[r.fecha];
     const data = { ...r, deleted: false, modifiedBy: _currentUser.uid, modifiedByEmail: _currentUser.email, modifiedAt: now };
     if (existingId) {
-      await FB.setDoc(FB.doc(_fbDb, 'teams', _teamId, 'registros', existingId), data, { merge: true });
+      await _fbDb.collection('teams').doc(_teamId).collection('registros').doc(existingId).set(data, { merge: true });
     } else {
       data.createdBy = _currentUser.uid;
       data.createdByEmail = _currentUser.email;
       data.createdAt = now;
-      await FB.addDoc(FB.collection(_fbDb, 'teams', _teamId, 'registros'), data);
+      await _fbDb.collection('teams').doc(_teamId).collection('registros').add(data);
     }
   }
 }
@@ -1383,19 +1352,14 @@ async function saveFirebaseConfig() {
 
 async function initFirebase(config) {
   if (_fbInitialized) return;
-  if (!window.FB) throw new Error('Firebase SDK no cargado');
-  _fbApp  = FB.initializeApp(config);
-  // initializeAuth con persistencia LOCAL en IndexedDB del PROPIO sitio.
-  // CLAVE: NO pasamos popupRedirectResolver aquí. Si se pasa, el SDK carga un
-  // iframe del dominio de Firebase (tercero) al ARRANCAR para restaurar la
-  // sesión, y Chrome lo bloquea (cookies de terceros) → pide login cada vez.
-  // Sin el resolver, la restauración lee solo IndexedDB local (sin terceros).
-  // El resolver se pasa puntualmente en signInWithPopup/Redirect (solo login).
-  _fbAuth = FB.initializeAuth(_fbApp, {
-    persistence: [FB.indexedDBLocalPersistence, FB.browserLocalPersistence]
-  });
-  _fbDb   = FB.getFirestore(_fbApp);
-  FB.onAuthStateChanged(_fbAuth, handleFbAuthChange);
+  if (!window.firebase) throw new Error('Firebase SDK no cargado');
+  // Inicialización IDÉNTICA a fibracontrol (que SÍ mantiene la sesión en móvil)
+  _fbApp  = firebase.initializeApp(config);
+  _fbAuth = firebase.auth();
+  _fbDb   = firebase.firestore();
+  try { await _fbDb.enablePersistence({ synchronizeTabs: true }); } catch(e) {}
+  await _fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+  _fbAuth.onAuthStateChanged(handleFbAuthChange);
   _fbInitialized = true;
 }
 
@@ -1428,33 +1392,26 @@ async function firebaseSignIn() {
     await new Promise(r => setTimeout(r, 1000));
   }
   if (!_fbAuth) { showToast('⚠️ Error cargando Firebase. Comprueba la conexión.', 'warn'); return; }
-  const provider = new FB.GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
+  // Login con popup (idéntico a fibracontrol, que SÍ mantiene la sesión).
+  // NO usamos signInWithRedirect ni getRedirectResult: cargan el iframe del
+  // dominio de terceros y rompen la persistencia en el móvil.
   try {
-    // Popup funciona en móvil y escritorio. El resolver (iframe de terceros)
-    // se usa SOLO aquí, durante el login. Si el navegador lo bloquea, caer a redirect.
-    await FB.signInWithPopup(_fbAuth, provider, FB.browserPopupRedirectResolver);
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await _fbAuth.signInWithPopup(provider);
     showToast('✅ Sesión iniciada');
-  } catch(e) {
-    if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment' || e.code === 'auth/cancelled-popup-request') {
-      try { sessionStorage.setItem('fb-redirect-pending', '1'); await FB.signInWithRedirect(_fbAuth, provider, FB.browserPopupRedirectResolver); }
-      catch(e2) { showToast('⚠️ ' + (e2.message || e2.code), 'warn'); }
-    } else {
-      showToast('⚠️ ' + (e.message || e.code), 'warn');
-    }
-  }
+  } catch(e) { showToast('⚠️ ' + (e.message || e.code), 'warn'); }
 }
 
 async function firebaseSignOut() {
   if (!_fbAuth) return;
-  try { await FB.signOut(_fbAuth); showToast('✅ Sesión cerrada'); }
+  try { await _fbAuth.signOut(); showToast('✅ Sesión cerrada'); }
   catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
 }
 
 function firebaseResetConfig() {
   if (!confirm('¿Cambiar la configuración de Firebase? Tendrás que pegar una nueva.')) return;
   (async () => {
-    if (_fbAuth) { try { await FB.signOut(_fbAuth); } catch {} }
+    if (_fbAuth) { try { await _fbAuth.signOut(); } catch {} }
     localStorage.removeItem(FB_CONFIG_KEY);
     _fbInitialized = false;
     _fbApp = null; _fbAuth = null; _fbDb = null;
@@ -1496,22 +1453,18 @@ async function findMyTeams() {
   const teams = [];
   const seen = new Set();
   try {
-    const memberSnap = await FB.getDocs(FB.query(
-      FB.collection(_fbDb, 'teams'),
-      FB.where('memberUids', 'array-contains', _currentUser.uid),
-      FB.where('appType', '==', APP_TYPE)
-    ));
+    const memberSnap = await _fbDb.collection('teams')
+      .where('memberUids', 'array-contains', _currentUser.uid)
+      .where('appType', '==', APP_TYPE).get();
     memberSnap.forEach(d => {
       teams.push({ id: d.id, ...d.data(), isMember: true });
       seen.add(d.id);
     });
   } catch(e) { console.warn('member query:', e); }
   try {
-    const inviteSnap = await FB.getDocs(FB.query(
-      FB.collection(_fbDb, 'teams'),
-      FB.where('invitedEmails', 'array-contains', _currentUser.email.toLowerCase()),
-      FB.where('appType', '==', APP_TYPE)
-    ));
+    const inviteSnap = await _fbDb.collection('teams')
+      .where('invitedEmails', 'array-contains', _currentUser.email.toLowerCase())
+      .where('appType', '==', APP_TYPE).get();
     inviteSnap.forEach(d => {
       if (!seen.has(d.id)) teams.push({ id: d.id, ...d.data(), isInvited: true });
     });
@@ -1520,45 +1473,45 @@ async function findMyTeams() {
 }
 
 async function createOwnTeam(user) {
-  await FB.setDoc(FB.doc(_fbDb, 'teams', user.uid), {
+  await _fbDb.collection('teams').doc(user.uid).set({
     ownerUid: user.uid,
     ownerEmail: user.email,
     name: 'Mi equipo',
     appType: APP_TYPE,
-    members: { [user.uid]: { email: user.email, role: 'admin', joinedAt: FB.serverTimestamp() } },
+    members: { [user.uid]: { email: user.email, role: 'admin', joinedAt: firebase.firestore.FieldValue.serverTimestamp() } },
     memberUids: [user.uid],
     invitedEmails: [],
     emailRoles: {},
-    createdAt: FB.serverTimestamp(),
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
     schemaVersion: 3
   });
 }
 
 async function tryMigrateV2(user) {
-  const oldRef = FB.doc(_fbDb, 'controlpersonal', user.uid);
+  const oldRef = _fbDb.collection('controlpersonal').doc(user.uid);
   let oldDoc;
-  try { oldDoc = await FB.getDoc(oldRef); } catch(e) { return; }
-  if (!oldDoc.exists()) return;
+  try { oldDoc = await oldRef.get(); } catch(e) { return; }
+  if (!oldDoc.exists) return;
   const oldData = oldDoc.data();
   if (oldData.migratedV3) return;
-  const newRegSnap = await FB.getDocs(FB.query(FB.collection(_fbDb, 'teams', user.uid, 'registros'), FB.limit(1)));
-  if (!newRegSnap.empty) { await FB.updateDoc(oldRef, { migratedV3: true }); return; }
+  const newRegSnap = await _fbDb.collection('teams').doc(user.uid).collection('registros').limit(1).get();
+  if (!newRegSnap.empty) { await oldRef.update({ migratedV3: true }); return; }
   if (Array.isArray(oldData.registros) && oldData.registros.length > 0) {
-    const now = FB.serverTimestamp();
+    const now = firebase.firestore.FieldValue.serverTimestamp();
     for (const r of oldData.registros) {
-      await FB.addDoc(FB.collection(_fbDb, 'teams', user.uid, 'registros'), {
+      await _fbDb.collection('teams').doc(user.uid).collection('registros').add({
         ...r, createdBy: user.uid, createdByEmail: user.email, createdAt: now,
         modifiedBy: user.uid, modifiedByEmail: user.email, modifiedAt: now,
         deleted: false
       });
     }
   }
-  await FB.setDoc(FB.doc(_fbDb, 'teams', user.uid, 'settings', 'main'), {
+  await _fbDb.collection('teams').doc(user.uid).collection('settings').doc('main').set({
     empleados: oldData.empleados || ['Yago', 'Juan', 'Jorge', 'Marcos', 'Braulio'],
     config: oldData.config || {},
-    modifiedBy: user.uid, modifiedAt: FB.serverTimestamp()
+    modifiedBy: user.uid, modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
   });
-  await FB.updateDoc(oldRef, { migratedV3: true });
+  await oldRef.update({ migratedV3: true });
   showToast('☁️ Datos migrados a v3.0');
   await logAudit('migrate_v2', { count: oldData.registros?.length || 0 });
 }
@@ -1571,8 +1524,8 @@ function subscribeToTeam(teamId) {
   _teamId = teamId;
   localStorage.setItem('lastTeamId', teamId);
 
-  _unsubTeam = FB.onSnapshot(FB.doc(_fbDb, 'teams', teamId), doc => {
-    if (!doc.exists()) return;
+  _unsubTeam = _fbDb.collection('teams').doc(teamId).onSnapshot(doc => {
+    if (!doc.exists) return;
     _teamData = { id: doc.id, ...doc.data() };
     _myRole = _teamData.members?.[_currentUser.uid]?.role || null;
     updateFirebaseUI();
@@ -1581,7 +1534,7 @@ function subscribeToTeam(teamId) {
   });
 
   // Carga inicial inmediata de registros (sin esperar al listener)
-  FB.getDocs(FB.query(FB.collection(_fbDb, 'teams', teamId, 'registros'), FB.where('deleted', '==', false))).then(snap => {
+  _fbDb.collection('teams').doc(teamId).collection('registros').where('deleted', '==', false).get().then(snap => {
     if (snap.empty) return;
     const clean = snap.docs.map(d => {
       const r = d.data();
@@ -1595,7 +1548,7 @@ function subscribeToTeam(teamId) {
     renderResumen && renderResumen();
   }).catch(() => {});
 
-  _unsubReg = FB.onSnapshot(FB.collection(_fbDb, 'teams', teamId, 'registros'), snap => {
+  _unsubReg = _fbDb.collection('teams').doc(teamId).collection('registros').onSnapshot(snap => {
     const active = [], trash = [];
     _registroDocs = {};
     snap.docs.forEach(d => {
@@ -1627,8 +1580,8 @@ function subscribeToTeam(teamId) {
     renderTrash();
   });
 
-  _unsubSettings = FB.onSnapshot(FB.doc(_fbDb, 'teams', teamId, 'settings', 'main'), doc => {
-    if (!doc.exists()) return;
+  _unsubSettings = _fbDb.collection('teams').doc(teamId).collection('settings').doc('main').onSnapshot(doc => {
+    if (!doc.exists) return;
     const data = doc.data();
     let changed = false;
     if (Array.isArray(data.empleados) && data.empleados.length > 0) { saveEmpleados(data.empleados); changed = true; }
@@ -1644,8 +1597,8 @@ function subscribeToTeam(teamId) {
   // Notas privadas admin (diario por empleado)
   if (_myRole === 'admin') {
     if (_unsubAdminNotes) _unsubAdminNotes();
-    _unsubAdminNotes = FB.onSnapshot(FB.doc(_fbDb, 'teams', teamId, 'adminPrivate', 'notes'), doc => {
-      _adminNotes = doc.exists() ? (doc.data().notes || {}) : {};
+    _unsubAdminNotes = _fbDb.collection('teams').doc(teamId).collection('adminPrivate').doc('notes').onSnapshot(doc => {
+      _adminNotes = doc.exists ? (doc.data().notes || {}) : {};
       renderAdminNotes();
       // Si el panel lateral está abierto, actualizarlo también
       const panel = document.getElementById('notas-admin-panel');
@@ -1653,12 +1606,11 @@ function subscribeToTeam(teamId) {
     }, err => { _adminNotes = {}; renderAdminNotes(); });
   }
 
-  _unsubAudit = FB.onSnapshot(
-    FB.query(FB.collection(_fbDb, 'teams', teamId, 'audit'), FB.orderBy('timestamp', 'desc'), FB.limit(100)),
-    snap => {
-      _auditEntries = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-      renderAuditLog();
-    });
+  _unsubAudit = _fbDb.collection('teams').doc(teamId).collection('audit')
+    .orderBy('timestamp', 'desc').limit(100).onSnapshot(snap => {
+    _auditEntries = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+    renderAuditLog();
+  });
 }
 
 // ═══════════════════════════════════════════════
@@ -1667,7 +1619,7 @@ function subscribeToTeam(teamId) {
 async function fbSaveRegistro(registro) {
   if (!_currentUser || !_fbDb || !_teamId) return false;
   const existingId = _registroDocs[registro.fecha];
-  const now = FB.serverTimestamp();
+  const now = firebase.firestore.FieldValue.serverTimestamp();
   const data = {
     ...registro,
     modifiedBy: _currentUser.uid,
@@ -1677,13 +1629,13 @@ async function fbSaveRegistro(registro) {
   };
   try {
     if (existingId) {
-      await FB.updateDoc(FB.doc(_fbDb, 'teams', _teamId, 'registros', existingId), data);
+      await _fbDb.collection('teams').doc(_teamId).collection('registros').doc(existingId).update(data);
       await logAudit('update', { fecha: registro.fecha, registroId: existingId });
     } else {
       data.createdBy = _currentUser.uid;
       data.createdByEmail = _currentUser.email;
       data.createdAt = now;
-      const ref = await FB.addDoc(FB.collection(_fbDb, 'teams', _teamId, 'registros'), data);
+      const ref = await _fbDb.collection('teams').doc(_teamId).collection('registros').add(data);
       await logAudit('create', { fecha: registro.fecha, registroId: ref.id });
     }
     return true;
@@ -1698,12 +1650,12 @@ async function fbSoftDelete(fecha) {
   if (!id) return;
   try {
     const autoPurge = new Date(Date.now() + 30*86400000);
-    await FB.updateDoc(FB.doc(_fbDb, 'teams', _teamId, 'registros', id), {
+    await _fbDb.collection('teams').doc(_teamId).collection('registros').doc(id).update({
       deleted: true,
       deletedBy: _currentUser.uid,
       deletedByEmail: _currentUser.email,
-      deletedAt: FB.serverTimestamp(),
-      autoPurgeAt: FB.Timestamp.fromDate(autoPurge)
+      deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      autoPurgeAt: firebase.firestore.Timestamp.fromDate(autoPurge)
     });
     await logAudit('delete', { fecha, registroId: id });
   } catch(e) { showToast('⚠️ Sin permisos', 'warn'); }
@@ -1712,7 +1664,7 @@ async function fbSoftDelete(fecha) {
 async function fbRestore(registroId) {
   try {
     const reg = _trashRegistros.find(r => r._id === registroId);
-    await FB.updateDoc(FB.doc(_fbDb, 'teams', _teamId, 'registros', registroId), {
+    await _fbDb.collection('teams').doc(_teamId).collection('registros').doc(registroId).update({
       deleted: false, deletedBy: null, deletedByEmail: null, deletedAt: null, autoPurgeAt: null
     });
     await logAudit('restore', { fecha: reg?.fecha, registroId });
@@ -1722,7 +1674,7 @@ async function fbRestore(registroId) {
 async function fbPurge(registroId) {
   try {
     const reg = _trashRegistros.find(r => r._id === registroId);
-    await FB.deleteDoc(FB.doc(_fbDb, 'teams', _teamId, 'registros', registroId));
+    await _fbDb.collection('teams').doc(_teamId).collection('registros').doc(registroId).delete();
     await logAudit('purge', { fecha: reg?.fecha, registroId });
   } catch(e) { showToast('⚠️ Sin permisos', 'warn'); }
 }
@@ -1731,12 +1683,12 @@ async function fbSaveSettings() {
   if (!_currentUser || !_fbDb || !_teamId) return;
   if (_myRole !== 'admin' && _myRole !== 'editor') return;
   try {
-    await FB.setDoc(FB.doc(_fbDb, 'teams', _teamId, 'settings', 'main'), {
+    await _fbDb.collection('teams').doc(_teamId).collection('settings').doc('main').set({
       empleados: getEmpleados(),
       config: getConfig(),
       modifiedBy: _currentUser.uid,
       modifiedByEmail: _currentUser.email,
-      modifiedAt: FB.serverTimestamp()
+      modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
     await logAudit('settings_change', {});
   } catch(e) {}
@@ -1760,9 +1712,9 @@ async function fbAddAdminNote(empleado) {
   const empNotes = _adminNotes[empleado] || [];
   empNotes.unshift(newEntry);  // más reciente primero
   try {
-    await FB.setDoc(FB.doc(_fbDb, 'teams', _teamId, 'adminPrivate', 'notes'),{
+    await _fbDb.collection('teams').doc(_teamId).collection('adminPrivate').doc('notes').set({
       notes: { ..._adminNotes, [empleado]: empNotes },
-      modifiedAt: FB.serverTimestamp()
+      modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
     ta.value = '';
     showToast('✅ Nota añadida');
@@ -1780,9 +1732,9 @@ async function fbDeleteAdminNote(empleado, idx) {
   renderAdminNotes && renderAdminNotes();
   showToast('✅ Nota eliminada');
   try {
-    await FB.setDoc(FB.doc(_fbDb, 'teams', _teamId, 'adminPrivate', 'notes'),{
+    await _fbDb.collection('teams').doc(_teamId).collection('adminPrivate').doc('notes').set({
       notes: _adminNotes,
-      modifiedAt: FB.serverTimestamp()
+      modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
 }
@@ -1822,11 +1774,11 @@ function renderAdminNotes() {
 async function logAudit(action, details = {}) {
   if (!_currentUser || !_teamId || !_fbDb) return;
   try {
-    await FB.addDoc(FB.collection(_fbDb, 'teams', _teamId, 'audit'), {
+    await _fbDb.collection('teams').doc(_teamId).collection('audit').add({
       action,
       actorUid: _currentUser.uid,
       actorEmail: _currentUser.email,
-      timestamp: FB.serverTimestamp(),
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
       ...details
     });
     // Indicador visual de nueva entrada en historial
@@ -1851,14 +1803,14 @@ async function generarCodigo() {
   for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
   const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   try {
-    await FB.setDoc(FB.doc(_fbDb, 'inviteCodes', code), {
+    await _fbDb.collection('inviteCodes').doc(code).set({
       teamId: _teamId,
       teamName: _teamData?.name || 'Mi equipo',
       appType: APP_TYPE,
       role,
       createdBy: _currentUser.uid,
-      createdAt: FB.serverTimestamp(),
-      expiresAt: FB.Timestamp.fromDate(expires),
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      expiresAt: firebase.firestore.Timestamp.fromDate(expires),
       used: false
     });
     await logAudit('invite_code_created', { code, role });
@@ -1870,7 +1822,7 @@ async function generarCodigo() {
 async function eliminarCodigo(code) {
   if (!confirm('¿Eliminar el código ' + code + '?')) return;
   try {
-    await FB.deleteDoc(FB.doc(_fbDb, 'inviteCodes', code));
+    await _fbDb.collection('inviteCodes').doc(code).delete();
     await cargarCodigosActivos();
     showToast('✅ Código eliminado');
   } catch(e) { showToast('⚠️ Error: ' + e.message, 'warn'); }
@@ -1881,11 +1833,10 @@ async function cargarCodigosActivos() {
   const wrap = document.getElementById('codigos-activos');
   if (!wrap) return;
   try {
-    const snap = await FB.getDocs(FB.query(
-      FB.collection(_fbDb, 'inviteCodes'),
-      FB.where('teamId', '==', _teamId),
-      FB.where('used', '==', false)
-    ));
+    const snap = await _fbDb.collection('inviteCodes')
+      .where('teamId', '==', _teamId)
+      .where('used', '==', false)
+      .get();
     if (snap.empty) { wrap.innerHTML = '<div style="font-size:12px;color:var(--text3)">No hay códigos activos.</div>'; return; }
     wrap.innerHTML = '<div style="font-size:11px;color:var(--text3);margin-bottom:6px;font-weight:600">CÓDIGOS ACTIVOS:</div>' +
       snap.docs.map(d => {
@@ -1906,26 +1857,26 @@ async function usarCodigo() {
   if (!code || code.length !== 6) { showToast('⚠️ Introduce un código de 6 caracteres', 'warn'); return; }
   if (!_fbAuth?.currentUser) { showToast('⚠️ Debes iniciar sesión primero', 'warn'); return; }
   try {
-    const snap = await FB.getDoc(FB.doc(_fbDb, 'inviteCodes', code));
-    if (!snap.exists()) { showToast('⚠️ Código inválido o ya usado', 'warn'); return; }
-    const dt = snap.data();
+    const doc = await _fbDb.collection('inviteCodes').doc(code).get();
+    if (!doc.exists) { showToast('⚠️ Código inválido o ya usado', 'warn'); return; }
+    const dt = doc.data();
     if (dt.used) { showToast('⚠️ Este código ya fue utilizado', 'warn'); return; }
     if (dt.appType !== APP_TYPE) { showToast('⚠️ Código de otra aplicación', 'warn'); return; }
     if (dt.expiresAt?.toDate && dt.expiresAt.toDate() < new Date()) { showToast('⚠️ El código ha caducado', 'warn'); return; }
     if (dt.teamId === _currentUser.uid) { showToast('⚠️ No puedes unirte a tu propio equipo', 'warn'); return; }
 
     // Unirse al equipo
-    await FB.updateDoc(FB.doc(_fbDb, 'teams', dt.teamId), {
+    await _fbDb.collection('teams').doc(dt.teamId).update({
       [`members.${_currentUser.uid}`]: {
         email: _currentUser.email,
         role: dt.role,
-        joinedAt: FB.serverTimestamp()
+        joinedAt: firebase.firestore.FieldValue.serverTimestamp()
       },
-      memberUids: FB.arrayUnion(_currentUser.uid)
+      memberUids: firebase.firestore.FieldValue.arrayUnion(_currentUser.uid)
     });
 
     // Marcar código como usado
-    await FB.updateDoc(snap.ref, { used: true, usedBy: _currentUser.uid, usedAt: FB.serverTimestamp() });
+    await doc.ref.update({ used: true, usedBy: _currentUser.uid, usedAt: firebase.firestore.FieldValue.serverTimestamp() });
 
     // Cambiar al nuevo equipo
     localStorage.setItem('lastTeamId', dt.teamId);
@@ -1948,7 +1899,7 @@ async function fbCancelInvite(email) {
 async function fbChangeRole(uid, newRole) {
   if (uid === _teamData.ownerUid) { showToast('⚠️ El propietario no cambia de rol', 'warn'); return; }
   try {
-    await FB.updateDoc(FB.doc(_fbDb, 'teams', _teamId), {
+    await _fbDb.collection('teams').doc(_teamId).update({
       [`members.${uid}.role`]: newRole
     });
     await logAudit('member_role_change', { targetUid: uid, role: newRole });
@@ -1961,9 +1912,9 @@ async function fbRemoveMember(uid) {
   const member = _teamData.members[uid];
   if (!confirm('¿Eliminar a ' + (member?.email || 'este miembro') + ' del equipo?')) return;
   try {
-    await FB.updateDoc(FB.doc(_fbDb, 'teams', _teamId), {
-      [`members.${uid}`]: FB.deleteField(),
-      memberUids: FB.arrayRemove(uid)
+    await _fbDb.collection('teams').doc(_teamId).update({
+      [`members.${uid}`]: firebase.firestore.FieldValue.delete(),
+      memberUids: firebase.firestore.FieldValue.arrayRemove(uid)
     });
     await logAudit('member_remove', { targetUid: uid, targetEmail: member?.email });
     showToast('✅ Miembro eliminado');
@@ -1971,18 +1922,18 @@ async function fbRemoveMember(uid) {
 }
 
 async function acceptInvitation(teamId) {
-  const teamRef = FB.doc(_fbDb, 'teams', teamId);
-  const snap = await FB.getDoc(teamRef);
-  if (!snap.exists()) return;
-  const data = snap.data();
+  const teamRef = _fbDb.collection('teams').doc(teamId);
+  const doc = await teamRef.get();
+  if (!doc.exists) return;
+  const data = doc.data();
   const email = _currentUser.email.toLowerCase();
   const role = data.emailRoles?.[emailKey(email)] || 'viewer';
   try {
-    await FB.updateDoc(teamRef, {
-      [`members.${_currentUser.uid}`]: { email: _currentUser.email, role, joinedAt: FB.serverTimestamp() },
-      memberUids: FB.arrayUnion(_currentUser.uid),
-      invitedEmails: FB.arrayRemove(email),
-      [`emailRoles.${emailKey(email)}`]: FB.deleteField()
+    await teamRef.update({
+      [`members.${_currentUser.uid}`]: { email: _currentUser.email, role, joinedAt: firebase.firestore.FieldValue.serverTimestamp() },
+      memberUids: firebase.firestore.FieldValue.arrayUnion(_currentUser.uid),
+      invitedEmails: firebase.firestore.FieldValue.arrayRemove(email),
+      [`emailRoles.${emailKey(email)}`]: firebase.firestore.FieldValue.delete()
     });
     await logAudit('member_join', {});
     // Cambiar automáticamente al equipo que se acaba de aceptar
@@ -2245,27 +2196,13 @@ function updateFirebaseSyncTime() {
 }
 
 async function firebaseAutoInit() {
-  // Esperar a que el SDK modular (window.FB) termine de cargar (es un módulo async)
-  if (!window.FB) {
-    await new Promise(res => {
-      window.addEventListener('fb-ready', res, { once: true });
-      setTimeout(res, 6000); // red de seguridad
-    });
-  }
-  if (!window.FB) { console.error('Firebase SDK no cargó'); updateFirebaseUI(); return; }
   try {
     await initFirebase(FIREBASE_CONFIG_HARDCODED);
   } catch(e) { console.error('Firebase init error:', e); }
-  // Pintar la UI de inmediato (no bloquear con el redirect)
   updateFirebaseUI();
-  // Procesar el resultado del redirect SOLO si venimos de un redirect de login
-  // (así no cargamos el iframe de terceros en cada arranque normal).
-  if (_fbAuth && sessionStorage.getItem('fb-redirect-pending')) {
-    sessionStorage.removeItem('fb-redirect-pending');
-    FB.getRedirectResult(_fbAuth, FB.browserPopupRedirectResolver)
-      .then(result => { if (result?.user) showToast('✅ Sesión iniciada'); })
-      .catch(() => {});
-  }
+  // NO llamamos getRedirectResult: cargaría el iframe del dominio de terceros
+  // al arrancar y rompería la persistencia de sesión en el móvil. fibracontrol
+  // tampoco lo hace y por eso mantiene la sesión.
 }
 
 // ═══════════════════════════════════════════════
@@ -2342,9 +2279,9 @@ async function addNoteFromPanel(emp) {
   renderAdminNotesPanel();
   showToast('✅ Nota añadida');
   try {
-    await FB.setDoc(FB.doc(_fbDb, 'teams', _teamId, 'adminPrivate', 'notes'),{
+    await _fbDb.collection('teams').doc(_teamId).collection('adminPrivate').doc('notes').set({
       notes: _adminNotes,
-      modifiedAt: FB.serverTimestamp()
+      modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   } catch(e) { showToast('⚠️ Error guardando: ' + e.message, 'warn'); }
 }
@@ -2400,8 +2337,9 @@ async function descargarDesdeFirebase(silencioso = false) {
   if (!silencioso) showToast('☁️ Descargando datos de Firebase…');
   try {
     // 1. Descargar empleados y configuración (settings)
-    const settingsDoc = await FB.getDoc(FB.doc(_fbDb, 'teams', _teamId, 'settings', 'main'));
-    if (settingsDoc.exists()) {
+    const settingsDoc = await _fbDb.collection('teams').doc(_teamId)
+      .collection('settings').doc('main').get();
+    if (settingsDoc.exists) {
       const s = settingsDoc.data();
       if (Array.isArray(s.empleados) && s.empleados.length > 0) {
         saveEmpleados(s.empleados);
@@ -2411,10 +2349,8 @@ async function descargarDesdeFirebase(silencioso = false) {
       if (s.config) saveConfig(s.config);
     }
     // 2. Descargar registros
-    const snap = await FB.getDocs(FB.query(
-      FB.collection(_fbDb, 'teams', _teamId, 'registros'),
-      FB.where('deleted', '==', false)
-    ));
+    const snap = await _fbDb.collection('teams').doc(_teamId)
+      .collection('registros').where('deleted', '==', false).get();
 
     // Limpiar campos internos de Firestore
     const records = snap.docs.map(d => {
@@ -2499,51 +2435,6 @@ async function instalarApp() {
   refreshInstallUI();
 }
 
-// ── DIAGNÓSTICO DE ALMACENAMIENTO ────────────────────
-function idbTest(mode, val) {
-  return new Promise((resolve) => {
-    let req;
-    try { req = indexedDB.open('diag-db', 1); } catch(e) { return resolve('ERROR open: ' + e.message); }
-    req.onupgradeneeded = () => { req.result.createObjectStore('kv'); };
-    req.onerror = () => resolve('ERROR: ' + (req.error?.message || 'idb'));
-    req.onsuccess = () => {
-      const db = req.result;
-      try {
-        const tx = db.transaction('kv', mode === 'set' ? 'readwrite' : 'readonly');
-        const st = tx.objectStore('kv');
-        if (mode === 'set') { st.put(val, 'stamp'); tx.oncomplete = () => resolve('ok'); tx.onerror = () => resolve('ERROR write'); }
-        else { const g = st.get('stamp'); g.onsuccess = () => resolve(g.result || '(vacío)'); g.onerror = () => resolve('ERROR read'); }
-      } catch(e) { resolve('ERROR tx: ' + e.message); }
-    };
-  });
-}
-
-async function ejecutarDiagnostico() {
-  const out = document.getElementById('diag-out');
-  const L = [];
-  // 1) localStorage (lo que guardó la vez anterior)
-  L.push('localStorage anterior: ' + (localStorage.getItem('diag-stamp') || '(vacío)'));
-  // 2) IndexedDB (lo que guardó la vez anterior)
-  L.push('IndexedDB anterior:   ' + await idbTest('get'));
-  // 3) Sesión Firebase actual
-  L.push('Sesión Firebase:      ' + (_fbAuth?.currentUser ? _fbAuth.currentUser.email : 'NO logueado'));
-  // 4) Bases de datos IndexedDB existentes
-  try { const dbs = await indexedDB.databases(); L.push('Bases IndexedDB:      ' + (dbs.map(d=>d.name).join(', ') || '(ninguna)')); } catch(e) { L.push('Bases IndexedDB:      no consultable'); }
-  // 5) ¿Almacenamiento persistente concedido?
-  if (navigator.storage?.persisted) { try { L.push('Persistente:          ' + await navigator.storage.persisted()); } catch(e){} }
-  // Guardar marca de tiempo nueva
-  const now = new Date().toLocaleTimeString('es');
-  localStorage.setItem('diag-stamp', now);
-  const idbWrite = await idbTest('set', now);
-  L.push('────────────────────');
-  L.push('Guardado AHORA: ' + now + (idbWrite === 'ok' ? '' : '  (idb: ' + idbWrite + ')'));
-  L.push('');
-  L.push('➡ RECARGA la página y pulsa otra vez.');
-  L.push('Si "anterior" muestra esta hora → SÍ guarda.');
-  L.push('Si sigue "(vacío)" → el móvil BORRA los datos.');
-  out.textContent = L.join('\n');
-}
-
 function showHelp() {
   document.getElementById('help-modal').style.display = 'flex';
 }
@@ -2610,7 +2501,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v5.2
+    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v5.3
   </span>
 </footer>
 </body>
