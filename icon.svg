@@ -1,4 +1,39 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="80" fill="#f59e0b"/>
-  <text x="256" y="340" font-size="280" text-anchor="middle" font-family="Arial">👷</text>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="0.55" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#1d4ed8"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <!-- Fondo a sangre (compatible maskable) -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <rect width="512" height="256" fill="url(#sheen)"/>
+
+  <!-- Grupo de personas (equipo) centrado en zona segura -->
+  <g fill="#ffffff">
+    <!-- Persona izquierda (atras) -->
+    <g opacity="0.78">
+      <circle cx="168" cy="212" r="42"/>
+      <path d="M104 360c0-41 29-72 64-72s64 31 64 72v8H104z"/>
+    </g>
+    <!-- Persona derecha (atras) -->
+    <g opacity="0.78">
+      <circle cx="344" cy="212" r="42"/>
+      <path d="M280 360c0-41 29-72 64-72s64 31 64 72v8H280z"/>
+    </g>
+    <!-- Persona central (delante) -->
+    <circle cx="256" cy="196" r="58"/>
+    <path d="M168 372c0-52 39-92 88-92s88 40 88 92v18H168z"/>
+  </g>
+
+  <!-- Insignia de check (control/validado) -->
+  <g>
+    <circle cx="360" cy="360" r="62" fill="#10b981" stroke="#ffffff" stroke-width="10"/>
+    <path d="M332 360l20 20 38-40" fill="none" stroke="#ffffff" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>
