@@ -2007,8 +2007,8 @@ function renderTeamMembers() {
     const roleLbl = { admin: '👑 Admin', editor: '✏ Editor', 'editor-own': '✏ Solo propios', viewer: '👁 Solo ver' }[m.role] || m.role;
     html += `<div style="display:flex;align-items:center;gap:.6rem;padding:.55rem .75rem;background:var(--bg);border-radius:.5rem;margin-bottom:.4rem;">
       <div style="flex:1;min-width:0;">
-        <div style="font-size:.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;">${m.email}${isOwner?' <span style="font-size:.7rem;color:var(--yellow);">(propietario)</span>':''}${isSelf?' <span style="font-size:.7rem;color:var(--blue);">(tú)</span>':''}</div>
-        <div style="font-size:.75rem;color:var(--muted);">${roleLbl}</div>
+        <div style="font-size:.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;">${m.email}${isOwner?' <span style="font-size:.7rem;color:var(--accent);">(propietario)</span>':''}${isSelf?' <span style="font-size:.7rem;color:var(--accent3);">(tú)</span>':''}</div>
+        <div style="font-size:.75rem;color:var(--text3);">${roleLbl}</div>
       </div>`;
     if (isAdmin && !isOwner) {
       html += `<select onchange="fbChangeRole('${uid}', this.value)" style="font-size:.75rem;padding:.25rem .4rem;min-width:0;width:auto;">
@@ -2017,25 +2017,25 @@ function renderTeamMembers() {
         <option value="editor-own"${m.role==='editor-own'?' selected':''}>Solo propios</option>
         <option value="viewer"${m.role==='viewer'?' selected':''}>Solo ver</option>
       </select>
-      <button class="btn btn-sm" style="background:rgba(239,68,68,.15);color:var(--red);" onclick="fbRemoveMember('${uid}')" title="Eliminar">✕</button>`;
+      <button class="btn btn-sm" style="background:rgba(239,68,68,.15);color:var(--danger);" onclick="fbRemoveMember('${uid}')" title="Eliminar">✕</button>`;
     }
     html += `</div>`;
   });
   if (invited.length > 0) {
-    html += '<div style="font-size:.75rem;color:var(--muted);margin:.75rem 0 .4rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Invitaciones pendientes</div>';
+    html += '<div style="font-size:.75rem;color:var(--text3);margin:.75rem 0 .4rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Invitaciones pendientes</div>';
     invited.forEach(email => {
       const role = emailRoles[emailKey(email)] || 'viewer';
       const roleLbl = { admin: '👑 Admin', editor: '✏ Editor', 'editor-own': '✏ Solo propios', viewer: '👁 Solo ver' }[role] || role;
       html += `<div style="display:flex;align-items:center;gap:.6rem;padding:.55rem .75rem;background:rgba(245,158,11,.06);border:1px dashed rgba(245,158,11,.3);border-radius:.5rem;margin-bottom:.4rem;">
         <div style="flex:1;min-width:0;">
-          <div style="font-size:.85rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;color:var(--yellow);">⏳ ${email}</div>
-          <div style="font-size:.75rem;color:var(--muted);">${roleLbl} — pendiente de aceptar</div>
+          <div style="font-size:.85rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;color:var(--accent);">⏳ ${email}</div>
+          <div style="font-size:.75rem;color:var(--text3);">${roleLbl} — pendiente de aceptar</div>
         </div>`;
       if (isAdmin) html += `<button class="btn btn-sm btn-ghost" onclick="fbCancelInvite('${email}')" title="Cancelar">✕</button>`;
       html += `</div>`;
     });
   }
-  wrap.innerHTML = html || '<div style="color:var(--muted);font-size:.85rem;padding:1rem;text-align:center;">Sin miembros aún</div>';
+  wrap.innerHTML = html || '<div style="color:var(--text3);font-size:.85rem;padding:1rem;text-align:center;">Sin miembros aún</div>';
 
   // Mostrar/ocultar zona de invitación
   const inviteBox = document.getElementById('invite-box');
@@ -2076,7 +2076,7 @@ function renderTrash() {
   const wrap = document.getElementById('trash-list');
   if (!wrap) return;
   if (_trashRegistros.length === 0) {
-    wrap.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:1rem;text-align:center;">Papelera vacía</div>';
+    wrap.innerHTML = '<div style="color:var(--text3);font-size:.85rem;padding:1rem;text-align:center;">Papelera vacía</div>';
     return;
   }
   const sorted = [..._trashRegistros].sort((a,b) => (b.deletedAt?.seconds || 0) - (a.deletedAt?.seconds || 0));
@@ -2085,12 +2085,12 @@ function renderTrash() {
     const purgeDate = r.autoPurgeAt?.toDate ? r.autoPurgeAt.toDate().toLocaleDateString('es') : '—';
     return `<div style="display:flex;align-items:center;gap:.6rem;padding:.6rem .85rem;background:var(--bg);border:1px solid var(--border);border-radius:.5rem;margin-bottom:.4rem;">
       <div style="flex:1;min-width:0;">
-        <div style="font-size:.85rem;font-weight:600;font-family:var(--mono);">${fmtFecha(r.fecha)} — ${r.metros||0} m</div>
-        <div style="font-size:.7rem;color:var(--muted);">Borrado: ${delDate} por ${r.deletedByEmail || '?'}</div>
-        <div style="font-size:.7rem;color:var(--red);">Se eliminará el ${purgeDate}</div>
+        <div style="font-size:.85rem;font-weight:600;font-family:monospace;">📅 ${formatDate(r.fecha)}</div>
+        <div style="font-size:.7rem;color:var(--text3);">Borrado: ${delDate} por ${r.deletedByEmail || '?'}</div>
+        <div style="font-size:.7rem;color:var(--danger);">Se eliminará el ${purgeDate}</div>
       </div>
-      <button class="btn btn-green btn-sm" onclick="fbRestore('${r._id}')" title="Recuperar">↺</button>
-      ${_myRole === 'admin' ? `<button class="btn btn-sm" style="background:rgba(239,68,68,.15);color:var(--red);" onclick="confirmPurge('${r._id}')" title="Borrar definitivo">✕</button>` : ''}
+      <button class="cloud-sync-btn" style="padding:6px 12px" onclick="fbRestore('${r._id}')" title="Recuperar">↺ Recuperar</button>
+      ${_myRole === 'admin' ? `<button class="cloud-sync-btn secondary" style="padding:6px 12px;color:var(--danger)" onclick="confirmPurge('${r._id}')" title="Borrar definitivo">✕</button>` : ''}
     </div>`;
   }).join('');
 }
@@ -2103,33 +2103,34 @@ function renderAuditLog() {
   const wrap = document.getElementById('audit-list');
   if (!wrap) return;
   if (_auditEntries.length === 0) {
-    wrap.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:1rem;text-align:center;">Sin actividad registrada</div>';
+    wrap.innerHTML = '<div style="color:var(--text3);font-size:.85rem;padding:1rem;text-align:center;">Sin actividad registrada</div>';
     return;
   }
   const actionLabels = {
-    create:    { icon: '➕', text: 'Creó día', color: 'var(--green)' },
-    update:    { icon: '✏️', text: 'Modificó día', color: 'var(--blue)' },
-    delete:    { icon: '🗑', text: 'Borró día', color: 'var(--red)' },
-    restore:   { icon: '↺', text: 'Restauró día', color: 'var(--green)' },
-    purge:     { icon: '✕', text: 'Borró definitivamente', color: 'var(--red)' },
-    settings_change:    { icon: '⚙', text: 'Cambió ajustes', color: 'var(--muted)' },
-    member_invite:      { icon: '✉', text: 'Invitó a', color: 'var(--yellow)' },
-    member_remove:      { icon: '👤✕', text: 'Eliminó miembro', color: 'var(--red)' },
-    member_role_change: { icon: '🔄', text: 'Cambió rol', color: 'var(--blue)' },
-    member_join:        { icon: '✓', text: 'Se unió al equipo', color: 'var(--green)' },
-    migrate_v2:         { icon: '⬆', text: 'Migró datos a v3.0', color: 'var(--yellow)' }
+    create:    { icon: '➕', text: 'Creó día', color: 'var(--accent2)' },
+    update:    { icon: '✏️', text: 'Modificó día', color: 'var(--accent3)' },
+    delete:    { icon: '🗑', text: 'Borró día', color: 'var(--danger)' },
+    restore:   { icon: '↺', text: 'Restauró día', color: 'var(--accent2)' },
+    purge:     { icon: '✕', text: 'Borró definitivamente', color: 'var(--danger)' },
+    settings_change:    { icon: '⚙', text: 'Cambió ajustes', color: 'var(--text3)' },
+    member_invite:      { icon: '✉', text: 'Invitó a', color: 'var(--accent)' },
+    member_remove:      { icon: '👤✕', text: 'Eliminó miembro', color: 'var(--danger)' },
+    member_role_change: { icon: '🔄', text: 'Cambió rol', color: 'var(--accent3)' },
+    member_join:        { icon: '✓', text: 'Se unió al equipo', color: 'var(--accent2)' },
+    invite_code_created:{ icon: '🔑', text: 'Generó código', color: 'var(--accent)' },
+    migrate_v2:         { icon: '⬆', text: 'Migró datos', color: 'var(--accent)' }
   };
   wrap.innerHTML = _auditEntries.slice(0, 50).map(e => {
-    const lbl = actionLabels[e.action] || { icon: '?', text: e.action, color: 'var(--muted)' };
+    const lbl = actionLabels[e.action] || { icon: '?', text: e.action, color: 'var(--text3)' };
     const date = e.timestamp?.toDate ? e.timestamp.toDate().toLocaleString('es') : '—';
     let target = '';
-    if (e.fecha)        target = ` — ${fmtFecha(e.fecha)}`;
+    if (e.fecha)        target = ` — ${formatDate(e.fecha)}`;
     else if (e.targetEmail) target = ` — ${e.targetEmail}`;
     return `<div style="display:flex;align-items:flex-start;gap:.6rem;padding:.5rem .75rem;border-bottom:1px solid var(--border);font-size:.82rem;">
       <span style="font-size:1.05rem;line-height:1;">${lbl.icon}</span>
       <div style="flex:1;min-width:0;">
         <div style="color:${lbl.color};font-weight:600;">${lbl.text}${target}</div>
-        <div style="font-size:.72rem;color:var(--muted);font-family:var(--mono);">${e.actorEmail} · ${date}</div>
+        <div style="font-size:.72rem;color:var(--text3);font-family:monospace;">${e.actorEmail} · ${date}</div>
       </div>
     </div>`;
   }).join('');
@@ -2501,7 +2502,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v5.4
+    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v5.5
   </span>
 </footer>
 </body>
