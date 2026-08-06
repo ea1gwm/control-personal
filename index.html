@@ -535,7 +535,19 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── DATA ────────────────────────────────────────────────────────
-function getData() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; } }
+// Aislamiento entre apps que comparten el mismo proyecto Firebase.
+// FibraControl y Control de Personal escriben en teams/{uid}/registros,
+// así que hay que descartar los documentos que no son de esta app:
+// los de FibraControl traen marcadores de producción (metros, objEq...).
+function esNuestroRegistro(r) {
+  if (!r) return false;
+  if (r.appType) return r.appType === 'controlpersonal';
+  if (r.prodDetalle !== undefined || r.metros !== undefined ||
+      r.objEq !== undefined || r.cumplimiento !== undefined) return false;
+  return true;
+}
+
+function getData() { try { return (JSON.parse(localStorage.getItem(STORAGE_KEY)) || []).filter(esNuestroRegistro); } catch { return []; } }
 function saveData(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
 function getEmpleados() {
   try { return JSON.parse(localStorage.getItem(STORAGE_EMP)) || DEFAULT_EMPLEADOS; } catch { return DEFAULT_EMPLEADOS; }
@@ -701,7 +713,7 @@ async function guardarDia() {
     return emp;
   });
 
-  const entry = { fecha, empleados: registros };
+  const entry = { fecha, empleados: registros, appType: APP_TYPE };
 
   // Guardar local
   const data = getData();
@@ -928,9 +940,12 @@ function eliminarDiaCP(fecha) {
       if (!regId) {
         try {
           const snap = await _fbDb.collection('teams').doc(_teamId).collection('registros')
-            .where('fecha', '==', fecha).where('deleted', '==', false).limit(1).get();
-          if (!snap.empty) {
-            regId = snap.docs[0].id;
+            .where('fecha', '==', fecha).where('deleted', '==', false).get();
+          // Ese mismo día puede tener también un registro de FibraControl:
+          // quedarse solo con el nuestro para no borrar el de la otra app.
+          const propio = snap.docs.find(d => esNuestroRegistro(d.data()));
+          if (propio) {
+            regId = propio.id;
             _registroDocs[fecha] = regId;
           }
         } catch(e) { console.warn('Firestore lookup:', e); }
@@ -1063,7 +1078,7 @@ async function pushAllDataToFirestore(arr) {
   const now = firebase.firestore.FieldValue.serverTimestamp();
   for (const r of arr) {
     const existingId = _registroDocs[r.fecha];
-    const data = { ...r, deleted: false, modifiedBy: _currentUser.uid, modifiedByEmail: _currentUser.email, modifiedAt: now };
+    const data = { ...r, appType: APP_TYPE, deleted: false, modifiedBy: _currentUser.uid, modifiedByEmail: _currentUser.email, modifiedAt: now };
     if (existingId) {
       await _fbDb.collection('teams').doc(_teamId).collection('registros').doc(existingId).set(data, { merge: true });
     } else {
@@ -1462,32 +1477,50 @@ async function findMyTeams() {
   if (!_currentUser || !_fbDb) return [];
   const teams = [];
   const seen = new Set();
+  // El filtro por app se hace en cliente: un equipo es de esta app si su
+  // array appTypes la incluye, o (esquema antiguo) si su appType coincide.
+  const esDeEstaApp = t => Array.isArray(t.appTypes) ? t.appTypes.includes(APP_TYPE)
+                         : (t.appType ? t.appType === APP_TYPE : true);
   try {
     const memberSnap = await _fbDb.collection('teams')
-      .where('memberUids', 'array-contains', _currentUser.uid)
-      .where('appType', '==', APP_TYPE).get();
+      .where('memberUids', 'array-contains', _currentUser.uid).get();
     memberSnap.forEach(d => {
-      teams.push({ id: d.id, ...d.data(), isMember: true });
+      const t = { id: d.id, ...d.data(), isMember: true };
+      if (!esDeEstaApp(t)) return;
+      teams.push(t);
       seen.add(d.id);
     });
   } catch(e) { console.warn('member query:', e); }
   try {
     const inviteSnap = await _fbDb.collection('teams')
-      .where('invitedEmails', 'array-contains', _currentUser.email.toLowerCase())
-      .where('appType', '==', APP_TYPE).get();
+      .where('invitedEmails', 'array-contains', _currentUser.email.toLowerCase()).get();
     inviteSnap.forEach(d => {
-      if (!seen.has(d.id)) teams.push({ id: d.id, ...d.data(), isInvited: true });
+      const t = { id: d.id, ...d.data(), isInvited: true };
+      if (!esDeEstaApp(t) || seen.has(d.id)) return;
+      teams.push(t);
     });
   } catch(e) { console.warn('invite query:', e); }
   return teams;
 }
 
 async function createOwnTeam(user) {
-  await _fbDb.collection('teams').doc(user.uid).set({
+  const ref = _fbDb.collection('teams').doc(user.uid);
+  // Si el equipo ya existe (lo pudo crear la otra app que comparte proyecto),
+  // NO sobrescribir: solo anotar que esta app también lo usa. Antes se hacía
+  // un .set() completo que borraba miembros, invitaciones y roles.
+  const snap = await ref.get();
+  if (snap.exists) {
+    await ref.set({
+      appTypes: firebase.firestore.FieldValue.arrayUnion(APP_TYPE)
+    }, { merge: true });
+    return;
+  }
+  await ref.set({
     ownerUid: user.uid,
     ownerEmail: user.email,
     name: 'Mi equipo',
     appType: APP_TYPE,
+    appTypes: [APP_TYPE],
     members: { [user.uid]: { email: user.email, role: 'admin', joinedAt: firebase.firestore.FieldValue.serverTimestamp() } },
     memberUids: [user.uid],
     invitedEmails: [],
@@ -1546,8 +1579,7 @@ function subscribeToTeam(teamId) {
   // Carga inicial inmediata de registros (sin esperar al listener)
   _fbDb.collection('teams').doc(teamId).collection('registros').where('deleted', '==', false).get().then(snap => {
     if (snap.empty) return;
-    const clean = snap.docs.map(d => {
-      const r = d.data();
+    const clean = snap.docs.map(d => d.data()).filter(esNuestroRegistro).map(r => {
       const { _id, createdBy, createdByEmail, createdAt, modifiedBy, modifiedByEmail,
               modifiedAt, deleted, deletedBy, deletedByEmail, deletedAt, autoPurgeAt, ...rest } = r;
       if (!rest.empleados || !Array.isArray(rest.empleados)) rest.empleados = [];
@@ -1563,6 +1595,8 @@ function subscribeToTeam(teamId) {
     _registroDocs = {};
     snap.docs.forEach(d => {
       const r = { _id: d.id, ...d.data() };
+      // Ignorar los registros de otra app (FibraControl) que comparte ruta
+      if (!esNuestroRegistro(r)) return;
       if (r.deleted) trash.push(r);
       else { active.push(r); _registroDocs[r.fecha] = d.id; }
     });
@@ -1618,7 +1652,9 @@ function subscribeToTeam(teamId) {
 
   _unsubAudit = _fbDb.collection('teams').doc(teamId).collection('audit')
     .orderBy('timestamp', 'desc').limit(100).onSnapshot(snap => {
-    _auditEntries = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+    // Descartar las entradas escritas por la otra app que comparte la ruta
+    _auditEntries = snap.docs.map(d => ({ _id: d.id, ...d.data() }))
+      .filter(a => !a.appType || a.appType === APP_TYPE);
     renderAuditLog();
   });
 }
@@ -1632,6 +1668,7 @@ async function fbSaveRegistro(registro) {
   const now = firebase.firestore.FieldValue.serverTimestamp();
   const data = {
     ...registro,
+    appType: APP_TYPE,
     modifiedBy: _currentUser.uid,
     modifiedByEmail: _currentUser.email,
     modifiedAt: now,
@@ -1786,6 +1823,7 @@ async function logAudit(action, details = {}) {
   try {
     await _fbDb.collection('teams').doc(_teamId).collection('audit').add({
       action,
+      appType: APP_TYPE,
       actorUid: _currentUser.uid,
       actorEmail: _currentUser.email,
       timestamp: firebase.firestore.FieldValue.serverTimestamp(),
@@ -2364,8 +2402,7 @@ async function descargarDesdeFirebase(silencioso = false) {
       .collection('registros').where('deleted', '==', false).get();
 
     // Limpiar campos internos de Firestore
-    const records = snap.docs.map(d => {
-      const r = d.data();
+    const records = snap.docs.map(d => d.data()).filter(esNuestroRegistro).map(r => {
       const { createdBy, createdByEmail, createdAt, modifiedBy, modifiedByEmail,
               modifiedAt, deleted, deletedBy, deletedByEmail, deletedAt, autoPurgeAt,
               ...rest } = r;
@@ -2512,7 +2549,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v5.6
+    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v5.7
   </span>
 </footer>
 </body>

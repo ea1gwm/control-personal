@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cp-cache-v11';
+const CACHE_NAME = 'cp-cache-v12';
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.add('./')).then(() => self.skipWaiting()));
