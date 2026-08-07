@@ -541,9 +541,16 @@ document.addEventListener('DOMContentLoaded', () => {
 // los de FibraControl traen marcadores de producción (metros, objEq...).
 function esNuestroRegistro(r) {
   if (!r) return false;
+  // 1) EL CONTENIDO MANDA. Si trae la lista de empleados es nuestro, pase lo
+  //    que pase con la etiqueta. Algunos días quedaron fusionados con
+  //    FibraControl (mismo documento por fecha) y llevan campos de las dos
+  //    apps: hay que mostrarlos igualmente, nunca ocultar datos del usuario.
+  if (Array.isArray(r.empleados)) return true;
+  // 2) Sin lista de empleados: decide la etiqueta.
   if (r.appType) return r.appType === 'controlpersonal';
-  if (r.prodDetalle !== undefined || r.metros !== undefined ||
-      r.objEq !== undefined || r.cumplimiento !== undefined) return false;
+  // 3) Antiguo y sin etiqueta: se descarta si es claramente de FibraControl.
+  if (r.prodDetalle !== undefined || r.metros !== undefined || r.objEq !== undefined ||
+      r.cumplimiento !== undefined || r.personas !== undefined) return false;
   return true;
 }
 
@@ -2549,7 +2556,7 @@ Object.defineProperty(window, '_cpReady', { get: () => !!(_fbAuth?.currentUser) 
 
 <footer style="text-align:center;padding:1.5rem 1rem 2.5rem;pointer-events:none;">
   <span style="font-size:.72rem;color:#30363d;font-family:'DM Mono',monospace;letter-spacing:.08em;">
-    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v5.7
+    creado por <span style="color:#60a5fa;font-weight:500;">Braulio</span> &nbsp;·&nbsp; v5.8
   </span>
 </footer>
 </body>
